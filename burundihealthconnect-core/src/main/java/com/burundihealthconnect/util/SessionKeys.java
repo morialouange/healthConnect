@@ -16,6 +16,9 @@ public final class SessionKeys {
     /** com.burundihealthconnect.entity.enums.Role — rôle de l'utilisateur connecté. */
     public static final String ROLE = "role";
 
+    /** String â€” code du rÃ´le exposÃ© aux vues JSP (ex. "ADMIN"). */
+    public static final String ROLE_CODE = "roleCode";
+
     /** Long — établissement de l'utilisateur connecté (toujours présent, même pour patient/medecin). */
     public static final String ID_ETABLISSEMENT = "idEtablissement";
 
@@ -37,4 +40,11 @@ public final class SessionKeys {
 
     /** String — code de langue pour l'internationalisation (ex: "fr", "en"). */
     public static final String LANGUE = "langue";
+
+    /**
+     * String — jeton CSRF (protocole synchronizer token) stocké en session.
+     * Le même jeton est aussi exposé en attribut de requête "csrfToken" par
+     * FiltreSecurite pour être injecté dans les pages (meta name="csrf-token").
+     */
+    public static final String CSRF_TOKEN = "csrfToken";
 }

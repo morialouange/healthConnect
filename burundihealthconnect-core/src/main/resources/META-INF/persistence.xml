@@ -46,8 +46,9 @@
         <class>com.burundihealthconnect.entity.HistoriqueRdv</class>
 
         <properties>
-            <!-- Le schéma est déjà créé par medicentral_script_v2.sql -->
-            <property name="jakarta.persistence.schema-generation.database.action" value="create-or-extend-tables"/>
+            <!-- Le schéma est déjà créé par medicentral_script_v2.sql.
+                 Ne jamais laisser le conteneur modifier la base automatiquement en production. -->
+            <property name="jakarta.persistence.schema-generation.database.action" value="none"/>
             <property name="eclipselink.logging.level" value="INFO"/>
             <property name="eclipselink.logging.level.sql" value="FINE"/>
             <property name="eclipselink.logging.parameters" value="true"/>

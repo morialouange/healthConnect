@@ -5,7 +5,6 @@ import com.burundihealthconnect.exception.BusinessException;
 import com.burundihealthconnect.util.SessionKeys;
 
 import jakarta.inject.Inject;
-import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -17,9 +16,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * DisponibiliteServlet — @WebServlet("/medecin/disponibilite/*")
@@ -51,7 +48,7 @@ public class DisponibiliteServlet extends HttpServlet {
             int page = 0;
             request.setAttribute("semaines", disponibiliteService.getMesSemaines(idMedecin, page));
             request.setAttribute("page", page);
-            forward(request, response, "/WEB-INF/views/medecin/disponibilite.jsp");
+            ServletUtils.forward(request, response, "/WEB-INF/views/medecin/disponibilite.jsp");
         } else {
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
         }
@@ -94,7 +91,7 @@ public class DisponibiliteServlet extends HttpServlet {
         String[] joursStr = request.getParameterValues("joursTravailles");
 
         if (dateDebutStr == null || dureeStr == null || joursStr == null || joursStr.length == 0) {
-            redirigerAvecErreur(request, response,
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/disponibilite/mes-semaines",
                     "Veuillez remplir tous les champs et choisir au moins un jour travaillé.");
             return;
         }
@@ -103,7 +100,7 @@ public class DisponibiliteServlet extends HttpServlet {
             LocalDate dateDebutSemaine = LocalDate.parse(dateDebutStr);
             int dureeCreneauMin = Integer.parseInt(dureeStr);
             if (dureeCreneauMin <= 0) {
-                redirigerAvecErreur(request, response, "La durée du créneau doit être positive.");
+                ServletUtils.redirigerAvecErreur(request, response, "/medecin/disponibilite/mes-semaines", "La durée du créneau doit être positive.");
                 return;
             }
 
@@ -113,14 +110,14 @@ public class DisponibiliteServlet extends HttpServlet {
                 String heureDebut = request.getParameter("heureDebut_" + jour);
                 String heureFin = request.getParameter("heureFin_" + jour);
                 if (heureDebut == null || heureFin == null) {
-                    redirigerAvecErreur(request, response,
+                    ServletUtils.redirigerAvecErreur(request, response, "/medecin/disponibilite/mes-semaines",
                             "Plage horaire manquante pour " + traduireJour(day) + ".");
                     return;
                 }
                 LocalTime debut = LocalTime.parse(heureDebut);
                 LocalTime fin = LocalTime.parse(heureFin);
                 if (!debut.isBefore(fin)) {
-                    redirigerAvecErreur(request, response,
+                    ServletUtils.redirigerAvecErreur(request, response, "/medecin/disponibilite/mes-semaines",
                             "L'heure de fin doit être après l'heure de début pour " + traduireJour(day) + ".");
                     return;
                 }
@@ -134,7 +131,7 @@ public class DisponibiliteServlet extends HttpServlet {
 
         } catch (BusinessException | IllegalArgumentException
                 | java.time.format.DateTimeParseException e) {
-            redirigerAvecErreur(request, response, "Données invalides : " + e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/disponibilite/mes-semaines", "Données invalides : " + e.getMessage());
         }
     }
 
@@ -157,16 +154,16 @@ public class DisponibiliteServlet extends HttpServlet {
 
     private void traiterSupprimerCreneau(HttpServletRequest request, HttpServletResponse response, Long idMedecin)
             throws IOException {
-        Long idCreneau = parseLongOuNull(request.getParameter("idCreneau"));
+        Long idCreneau = ServletUtils.parseLongOuNull(request.getParameter("idCreneau"));
         if (idCreneau == null) {
-            redirigerAvecErreur(request, response, "Créneau introuvable.");
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/disponibilite/mes-semaines", "Créneau introuvable.");
             return;
         }
         try {
             disponibiliteService.supprimerCreneau(idCreneau, idMedecin);
             response.sendRedirect(request.getContextPath() + "/medecin/disponibilite/mes-semaines?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/disponibilite/mes-semaines", e.getMessage());
         }
     }
 
@@ -176,78 +173,17 @@ public class DisponibiliteServlet extends HttpServlet {
 
     private void traiterCopierSemaine(HttpServletRequest request, HttpServletResponse response)
             throws IOException {
-        Long idDisponibilite = parseLongOuNull(request.getParameter("idDisponibilite"));
+        Long idDisponibilite = ServletUtils.parseLongOuNull(request.getParameter("idDisponibilite"));
         if (idDisponibilite == null) {
-            redirigerAvecErreur(request, response, "Semaine introuvable.");
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/disponibilite/mes-semaines", "Semaine introuvable.");
             return;
         }
         try {
             disponibiliteService.copierSemaineSuivante(idDisponibilite);
             response.sendRedirect(request.getContextPath() + "/medecin/disponibilite/mes-semaines?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/disponibilite/mes-semaines", e.getMessage());
         }
     }
 
-    // =========================================================
-    // VALIDATION
-    // =========================================================
-
-    private static final Pattern EMAIL_PATTERN =
-        Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
-    private static final int MAX_LENGTH = 100;
-
-    private boolean isValidEmail(String email) {
-        return email != null && EMAIL_PATTERN.matcher(email).matches();
-    }
-
-    private boolean isValidTelephone(String telephone) {
-        return telephone == null || telephone.isBlank() || telephone.replaceAll("[^0-9]", "").length() >= 8
-            && telephone.replaceAll("[^0-9]", "").length() <= 15;
-    }
-
-    private boolean isValidMaxLength(String valeur, int max) {
-        return valeur == null || valeur.length() <= max;
-    }
-
-    private boolean isExperienceValide(String experienceStr) {
-        if (experienceStr == null || experienceStr.isBlank()) return true;
-        try {
-            return Integer.parseInt(experienceStr.replaceAll("[^0-9\\-]", "")) >= 0;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
-    // =========================================================
-    // UTILITAIRES
-    // =========================================================
-
-    private void redirigerAvecErreur(HttpServletRequest request, HttpServletResponse response, String message)
-            throws IOException {
-        response.sendRedirect(request.getContextPath() + "/medecin/disponibilite/mes-semaines?erreur="
-                + java.net.URLEncoder.encode(message, java.nio.charset.StandardCharsets.UTF_8));
-    }
-
-    private Long parseLongOuNull(String valeur) {
-        try {
-            return (valeur == null || valeur.isBlank()) ? null : Long.parseLong(valeur);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private String message(HttpServletRequest request, String key) {
-        String lang = (String) request.getSession().getAttribute("langue");
-        if (lang == null) lang = "fr";
-        Locale locale = Locale.forLanguageTag(lang);
-        java.util.ResourceBundle bundle = java.util.ResourceBundle.getBundle("com.burundihealthconnect.i18n.messages", locale);
-        return bundle.getString(key);
-    }
-
-    private void forward(HttpServletRequest request, HttpServletResponse response, String vue)
-            throws ServletException, IOException {
-        RequestDispatcher dispatcher = request.getRequestDispatcher(vue);
-        dispatcher.forward(request, response);
-    }
 }

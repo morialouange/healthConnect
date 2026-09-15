@@ -1,7 +1,7 @@
 (function () {
     "use strict";
 
-    var THEME_KEY = "bhc-theme";
+    var THEME_KEY = "mc-theme";
 
     function appliquerTheme(theme) {
         document.documentElement.setAttribute("data-theme", theme);
@@ -19,10 +19,25 @@
         }
     };
 
+    function initCsrf() {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (!meta) return;
+        var token = meta.getAttribute("content");
+        if (!token) return;
+        document.querySelectorAll('form[method="post"]').forEach(function (form) {
+            var input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "csrfToken";
+            input.value = token;
+            form.appendChild(input);
+        });
+    }
+
     function init() {
         var saved = null;
         try { saved = localStorage.getItem(THEME_KEY); } catch (e) {}
         if (saved) appliquerTheme(saved);
+        initCsrf();
     }
 
     if (document.readyState === "loading") {

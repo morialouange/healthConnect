@@ -8,7 +8,6 @@ import com.burundihealthconnect.exception.BusinessException;
 import com.burundihealthconnect.util.SessionKeys;
 
 import jakarta.inject.Inject;
-import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -16,8 +15,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
-import java.util.Locale;
-import java.util.regex.Pattern;
 
 /**
  * AuthServlet — @WebServlet("/auth")
@@ -48,9 +45,9 @@ public class AuthServlet extends HttpServlet {
         }
 
         if ("register".equals(action)) {
-            forward(request, response, "/WEB-INF/views/auth/register.jsp");
+            ServletUtils.forward(request, response, "/WEB-INF/views/auth/register.jsp");
         } else {
-            forward(request, response, "/WEB-INF/views/auth/login.jsp");
+            ServletUtils.forward(request, response, "/WEB-INF/views/auth/login.jsp");
         }
     }
 
@@ -91,13 +88,13 @@ public class AuthServlet extends HttpServlet {
         String motDePasse = request.getParameter("motDePasse");
 
         if (email == null || email.isBlank() || motDePasse == null || motDePasse.isBlank()) {
-            request.setAttribute("erreur", message(request, "message.error.required_fields"));
-            forward(request, response, "/WEB-INF/views/auth/login.jsp");
+            request.setAttribute("erreur", ServletUtils.message(request, "message.error.required_fields"));
+            ServletUtils.forward(request, response, "/WEB-INF/views/auth/login.jsp");
             return;
         }
-        if (!isValidEmail(email.trim())) {
-            request.setAttribute("erreur", message(request, "error.validation.email"));
-            forward(request, response, "/WEB-INF/views/auth/login.jsp");
+        if (!ServletUtils.isValidEmail(email.trim())) {
+            request.setAttribute("erreur", ServletUtils.message(request, "error.validation.email"));
+            ServletUtils.forward(request, response, "/WEB-INF/views/auth/login.jsp");
             return;
         }
 
@@ -109,7 +106,7 @@ public class AuthServlet extends HttpServlet {
 
         } catch (BusinessException e) {
             request.setAttribute("erreur", e.getMessage());
-            forward(request, response, "/WEB-INF/views/auth/login.jsp");
+            ServletUtils.forward(request, response, "/WEB-INF/views/auth/login.jsp");
         }
     }
 
@@ -180,85 +177,37 @@ public class AuthServlet extends HttpServlet {
 
         StringBuilder erreurs = new StringBuilder();
         if (fullName == null || fullName.isBlank()) {
-            erreurs.append(message(request, "error.validation.fullname.required")).append(" ");
-        } else if (!isValidMaxLength(fullName, MAX_LENGTH)) {
-            erreurs.append(message(request, "error.validation.fullname.length")).append(" ");
+            erreurs.append(ServletUtils.message(request, "error.validation.fullname.required")).append(" ");
+        } else if (!ServletUtils.isValidMaxLength(fullName, ServletUtils.MAX_LENGTH)) {
+            erreurs.append(ServletUtils.message(request, "error.validation.fullname.length")).append(" ");
         }
-        if (email == null || email.isBlank() || !isValidEmail(email)) {
-            erreurs.append(message(request, "error.validation.email")).append(" ");
+        if (email == null || email.isBlank() || !ServletUtils.isValidEmail(email)) {
+            erreurs.append(ServletUtils.message(request, "error.validation.email")).append(" ");
         }
         if (motDePasse == null || motDePasse.isBlank()) {
-            erreurs.append(message(request, "error.validation.password.required")).append(" ");
+            erreurs.append(ServletUtils.message(request, "error.validation.password.required")).append(" ");
         } else if (motDePasse.length() < 8) {
-            erreurs.append(message(request, "error.validation.password.min")).append(" ");
+            erreurs.append(ServletUtils.message(request, "error.validation.password.min")).append(" ");
         }
         if (motDePasse != null && !motDePasse.equals(confirmationMotDePasse)) {
-            erreurs.append(message(request, "message.error.password_mismatch")).append(" ");
+            erreurs.append(ServletUtils.message(request, "message.error.password_mismatch")).append(" ");
         }
         // Patient non rattaché à un établissement — champ ignoré
 
         if (erreurs.length() > 0) {
             request.setAttribute("erreur", erreurs.toString());
-            forward(request, response, "/WEB-INF/views/auth/register.jsp");
+            ServletUtils.forward(request, response, "/WEB-INF/views/auth/register.jsp");
             return;
         }
 
         try {
             authService.inscrirePatient(fullName.trim(), email.trim(), motDePasse);
-            request.setAttribute("succes", message(request, "message.success.inscription"));
-            forward(request, response, "/WEB-INF/views/auth/login.jsp");
+            request.setAttribute("succes", ServletUtils.message(request, "message.success.inscription"));
+            ServletUtils.forward(request, response, "/WEB-INF/views/auth/login.jsp");
 
         } catch (BusinessException e) {
             request.setAttribute("erreur", e.getMessage());
-            forward(request, response, "/WEB-INF/views/auth/register.jsp");
+            ServletUtils.forward(request, response, "/WEB-INF/views/auth/register.jsp");
         }
-    }
-
-    // =========================================================
-    // VALIDATION
-    // =========================================================
-
-    private static final Pattern EMAIL_PATTERN =
-        Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
-    private static final int MAX_LENGTH = 100;
-
-    private boolean isValidEmail(String email) {
-        return email != null && EMAIL_PATTERN.matcher(email).matches();
-    }
-
-    private boolean isValidTelephone(String telephone) {
-        return telephone == null || telephone.isBlank() || telephone.replaceAll("[^0-9]", "").length() >= 8
-            && telephone.replaceAll("[^0-9]", "").length() <= 15;
-    }
-
-    private boolean isValidMaxLength(String valeur, int max) {
-        return valeur == null || valeur.length() <= max;
-    }
-
-    private boolean isExperienceValide(String experienceStr) {
-        if (experienceStr == null || experienceStr.isBlank()) return true;
-        try {
-            return Integer.parseInt(experienceStr.replaceAll("[^0-9\\-]", "")) >= 0;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
-    // =========================================================
-    // UTILITAIRE
-    // =========================================================
-
-    private String message(HttpServletRequest request, String key) {
-        String lang = (String) request.getSession().getAttribute("langue");
-        if (lang == null) lang = "fr";
-        Locale locale = Locale.forLanguageTag(lang);
-        java.util.ResourceBundle bundle = java.util.ResourceBundle.getBundle("com.burundihealthconnect.i18n.messages", locale);
-        return bundle.getString(key);
-    }
-
-    private void forward(HttpServletRequest request, HttpServletResponse response, String vue)
-            throws ServletException, IOException {
-        RequestDispatcher dispatcher = request.getRequestDispatcher(vue);
-        dispatcher.forward(request, response);
     }
 }

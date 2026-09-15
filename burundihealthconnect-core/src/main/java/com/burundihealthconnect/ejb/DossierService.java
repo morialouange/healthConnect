@@ -72,7 +72,7 @@ public class DossierService {
             q.setParameter("numero", numeroPatient);
             return q.getSingleResult();
         } catch (NoResultException e) {
-            throw new EntiteIntrouvableException("DossierMedical (numero_patient=" + numeroPatient + ")", null);
+            throw new EntiteIntrouvableException("DossierMedical (numero_patient=" + numeroPatient + ")", numeroPatient);
         }
     }
 
@@ -214,7 +214,14 @@ public class DossierService {
      */
     public List<AccesDossier> getJournalAccesGlobal(int page) {
         return em.createQuery(
-                        "SELECT a FROM AccesDossier a ORDER BY a.dateAcces DESC", AccesDossier.class)
+                        "SELECT a FROM AccesDossier a " +
+                        "JOIN FETCH a.dossier d " +
+                        "JOIN FETCH d.patient p " +
+                        "JOIN FETCH p.utilisateur " +
+                        "JOIN FETCH a.medecin m " +
+                        "JOIN FETCH m.utilisateur " +
+                        "JOIN FETCH a.etablissement " +
+                        "ORDER BY a.dateAcces DESC", AccesDossier.class)
                 .setFirstResult(page * TAILLE_PAGE)
                 .setMaxResults(TAILLE_PAGE)
                 .getResultList();
@@ -226,7 +233,14 @@ public class DossierService {
      */
     public List<HistoriqueModification> getHistoriqueModificationsGlobal(int page) {
         return em.createQuery(
-                        "SELECT h FROM HistoriqueModification h ORDER BY h.dateModification DESC",
+                        "SELECT h FROM HistoriqueModification h " +
+                        "JOIN FETCH h.dossier d " +
+                        "JOIN FETCH d.patient p " +
+                        "JOIN FETCH p.utilisateur " +
+                        "JOIN FETCH h.medecin m " +
+                        "JOIN FETCH m.utilisateur " +
+                        "JOIN FETCH h.etablissement " +
+                        "ORDER BY h.dateModification DESC",
                         HistoriqueModification.class)
                 .setFirstResult(page * TAILLE_PAGE)
                 .setMaxResults(TAILLE_PAGE)

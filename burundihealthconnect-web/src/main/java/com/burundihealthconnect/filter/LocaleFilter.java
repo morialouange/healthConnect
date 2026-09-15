@@ -44,6 +44,8 @@ public class LocaleFilter implements Filter {
         if (sessionLang != null) {
             request.setAttribute("jakarta.servlet.jsp.jstl.fmt.locale", sessionLang);
             request.setAttribute("jakarta.servlet.jsp.jstl.fmt.fallbackLocale", "fr");
+            session.setAttribute("jakarta.servlet.jsp.jstl.fmt.locale", sessionLang);
+            session.setAttribute("jakarta.servlet.jsp.jstl.fmt.fallbackLocale", "fr");
         }
 
         chain.doFilter(req, res);

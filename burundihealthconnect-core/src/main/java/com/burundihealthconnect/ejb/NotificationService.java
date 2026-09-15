@@ -67,6 +67,18 @@ public class NotificationService {
         return q.getResultList();
     }
 
+    /** Liste les N notifications les plus récentes (lues + non lues) — dashboard patient. */
+    public List<Notification> getRecentes(Long idUtilisateur, int max) {
+        TypedQuery<Notification> q = em.createQuery(
+                "SELECT n FROM Notification n " +
+                        "WHERE n.utilisateur.idUtilisateur = :id " +
+                        "ORDER BY n.dateCreation DESC",
+                Notification.class);
+        q.setParameter("id", idUtilisateur);
+        q.setMaxResults(max);
+        return q.getResultList();
+    }
+
     /** Marque une notification comme lue. */
     public void marquerCommeLue(Long idNotif) {
         Notification notification = em.find(Notification.class, idNotif);

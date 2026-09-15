@@ -262,7 +262,7 @@ public class EtablissementService {
 
         // Prochain passage detail
         List<Object[]> prochainPassage = em.createQuery(
-                "SELECT r.dateRendez, r.etablissement.nom, r.medecin.utilisateur.fullName, r.statut, r.idRendez, r.priorite FROM RendezVous r " +
+                "SELECT r.dateRendez, r.etablissement.nom, r.medecin.utilisateur.fullName, r.statut, r.idRendez, r.priorite, r.medecin.specialite, r.service.nom FROM RendezVous r " +
                         "WHERE r.patient.idPatient = :idPatient AND r.dateRendez >= :maintenant AND r.statut != :annule ORDER BY r.dateRendez ASC", Object[].class)
                 .setParameter("idPatient", idPatient)
                 .setParameter("maintenant", LocalDateTime.now())
@@ -278,6 +278,8 @@ public class EtablissementService {
             passage.put("statut", row[3]);
             passage.put("idRendez", row[4]);
             passage.put("priorite", row[5]);
+            passage.put("specialite", row[6]);
+            passage.put("service", row[7]);
             passage.put("annulable", row[3] == StatutRdv.RDV_DEMANDE);
             stats.put("prochainPassage", passage);
         } else {
@@ -356,6 +358,54 @@ public class EtablissementService {
         stats.put("tauxPresence", totalRdv > 0 ? (rdvTermines * 100 / totalRdv) : 0);
 
         stats.put("chartTimelineMedicale", chartTimelineMedicalePatient(idPatient));
+        stats.put("statutRdvComplet", chartRdvParStatutCompletPatient(idPatient));
+
+        // Historique récent des rendez-vous (dashboard patient)
+        java.time.format.DateTimeFormatter rdvDateFmt = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        java.time.format.DateTimeFormatter rdvHeureFmt = java.time.format.DateTimeFormatter.ofPattern("HH:mm");
+        List<Object[]> rdvRecentsRows = em.createQuery(
+                "SELECT r.dateRendez, r.medecin.utilisateur.fullName, r.medecin.specialite, r.statut FROM RendezVous r " +
+                        "WHERE r.patient.idPatient = :idPatient ORDER BY r.dateRendez DESC", Object[].class)
+                .setParameter("idPatient", idPatient)
+                .setMaxResults(5)
+                .getResultList();
+        List<Map<String, Object>> rdvRecents = new ArrayList<>();
+        for (Object[] row : rdvRecentsRows) {
+            Map<String, Object> rr = new HashMap<>();
+            if (row[0] instanceof java.time.LocalDateTime) {
+                java.time.LocalDateTime ldt = (java.time.LocalDateTime) row[0];
+                rr.put("date", ldt.toLocalDate().format(rdvDateFmt));
+                rr.put("heure", ldt.toLocalTime().format(rdvHeureFmt));
+            } else {
+                rr.put("date", row[0] != null ? String.valueOf(row[0]) : "");
+                rr.put("heure", "");
+            }
+            rr.put("medecin", row[1] != null ? String.valueOf(row[1]) : "");
+            rr.put("specialite", row[2] != null ? String.valueOf(row[2]) : "");
+            rr.put("statut", row[3] != null ? String.valueOf(row[3]) : "");
+            rdvRecents.add(rr);
+        }
+        stats.put("rdvRecents", rdvRecents);
+
+        // Ordonnances actives : lignes de prescription récentes (dashboard patient)
+        List<Object[]> ordRows = em.createQuery(
+                "SELECT l.medicament, l.dosage, l.frequence, l.dureeJours, o.consultation.medecin.utilisateur.fullName " +
+                        "FROM LignePrescription l JOIN l.ordonance o " +
+                        "WHERE o.consultation.dossier.patient.idPatient = :idPatient ORDER BY o.createdAt DESC", Object[].class)
+                .setParameter("idPatient", idPatient)
+                .setMaxResults(6)
+                .getResultList();
+        List<Map<String, Object>> ordonnancesActives = new ArrayList<>();
+        for (Object[] row : ordRows) {
+            Map<String, Object> orm = new HashMap<>();
+            orm.put("medicament", row[0] != null ? String.valueOf(row[0]) : "");
+            orm.put("dosage", row[1] != null ? String.valueOf(row[1]) : "");
+            orm.put("frequence", row[2] != null ? String.valueOf(row[2]) : "");
+            orm.put("dureeJours", row[3] != null ? row[3] : "");
+            orm.put("medecin", row[4] != null ? String.valueOf(row[4]) : "");
+            ordonnancesActives.add(orm);
+        }
+        stats.put("ordonnancesActives", ordonnancesActives);
 
         // JSP aliases
         stats.put("chartPatientMois", stats.get("chartRdvParMois"));
@@ -387,8 +437,9 @@ public class EtablissementService {
                 detail.put("heure", "");
             }
             detail.put("medecin", passage.getOrDefault("medecin", ""));
+            detail.put("specialite", passage.getOrDefault("specialite", ""));
             detail.put("hopital", passage.getOrDefault("hopital", ""));
-            detail.put("service", "");
+            detail.put("service", passage.getOrDefault("service", ""));
             detail.put("statut", passage.getOrDefault("statut", ""));
             detail.put("idRendezVous", passage.getOrDefault("idRendez", ""));
             stats.put("prochainRdvDetail", detail);
@@ -424,7 +475,50 @@ public class EtablissementService {
         }
         stats.put("timelineMedicale", tlList);
 
+        // Trends KPI (vs jour précédent / vs mois précédent)
+        LocalDateTime debutHier = LocalDate.now().minusDays(1).atStartOfDay();
+        LocalDateTime finHier = LocalDate.now().atStartOfDay();
+
+        long attenteHier = em.createQuery(
+                "SELECT COUNT(r) FROM RendezVous r WHERE r.patient.idPatient = :id AND r.statut = :s AND r.dateRendez >= :d AND r.dateRendez < :f", Long.class)
+                .setParameter("id", idPatient).setParameter("s", StatutRdv.RDV_DEMANDE).setParameter("d", debutHier).setParameter("f", finHier)
+                .getSingleResult();
+        stats.put("trendRdvEnAttenteConfirmation", calculerTrend(rdvEnAttenteConfirmation, attenteHier));
+
+        LocalDateTime debutMois = YearMonth.now().atDay(1).atStartOfDay();
+        LocalDateTime finMois = YearMonth.now().plusMonths(1).atDay(1).atStartOfDay();
+        LocalDateTime debutMoisPrec = YearMonth.now().minusMonths(1).atDay(1).atStartOfDay();
+        LocalDateTime finMoisPrec = YearMonth.now().atDay(1).atStartOfDay();
+
+        long ordonnancesMoisPrec = em.createQuery(
+                "SELECT COUNT(o) FROM Ordonance o WHERE o.consultation.dossier.patient.idPatient = :id AND o.createdAt >= :d AND o.createdAt < :f", Long.class)
+                .setParameter("id", idPatient).setParameter("d", debutMoisPrec).setParameter("f", finMoisPrec)
+                .getSingleResult();
+        stats.put("trendOrdonnances", calculerTrend(ordonnancesDisponibles, ordonnancesMoisPrec));
+
+        long consVerseesMois = em.createQuery(
+                "SELECT COUNT(c) FROM Consultation c WHERE c.dossier.patient.idPatient = :id AND c.statut = :s AND c.dateConsultation >= :d AND c.dateConsultation < :f", Long.class)
+                .setParameter("id", idPatient)
+                .setParameter("s", com.burundihealthconnect.entity.enums.StatutConsultation.VERSEE_AU_DOSSIER)
+                .setParameter("d", debutMois).setParameter("f", finMois)
+                .getSingleResult();
+        long consVerseesMoisPrec = em.createQuery(
+                "SELECT COUNT(c) FROM Consultation c WHERE c.dossier.patient.idPatient = :id AND c.statut = :s AND c.dateConsultation >= :d AND c.dateConsultation < :f", Long.class)
+                .setParameter("id", idPatient)
+                .setParameter("s", com.burundihealthconnect.entity.enums.StatutConsultation.VERSEE_AU_DOSSIER)
+                .setParameter("d", debutMoisPrec).setParameter("f", finMoisPrec)
+                .getSingleResult();
+        stats.put("trendConsultationsVersees", calculerTrend(consVerseesMois, consVerseesMoisPrec));
+
         return stats;
+    }
+
+    private static final String[] MOIS_ABREGES = {
+            "JAN", "FEV", "MAR", "AVR", "MAI", "JUIN", "JUIL", "AO\u00DBT", "SEP", "OCT", "NOV", "DEC"
+    };
+
+    private static String moisAbrege(YearMonth ym) {
+        return MOIS_ABREGES[ym.getMonthValue() - 1];
     }
 
     private List<String[]> chartTimelineMedicalePatient(Long idPatient) {
@@ -438,7 +532,7 @@ public class EtablissementService {
                     .setParameter("id", idPatient)
                     .setParameter("d", debut).setParameter("f", fin)
                     .getSingleResult();
-            result.add(new String[]{ym.getMonth().toString().substring(0, 3), String.valueOf(nb)});
+            result.add(new String[]{moisAbrege(ym), String.valueOf(nb)});
         }
         return result;
     }
@@ -454,7 +548,7 @@ public class EtablissementService {
                     .setParameter("id", idPatient)
                     .setParameter("d", debut).setParameter("f", fin)
                     .getSingleResult();
-            result.add(new String[]{ym.getMonth().toString().substring(0, 3), String.valueOf(nb)});
+            result.add(new String[]{moisAbrege(ym), String.valueOf(nb)});
         }
         return result;
     }
@@ -470,6 +564,19 @@ public class EtablissementService {
             if (nb > 0) {
                 result.add(new String[]{s.name(), String.valueOf(nb)});
             }
+        }
+        return result;
+    }
+
+    private List<String[]> chartRdvParStatutCompletPatient(Long idPatient) {
+        List<String[]> result = new ArrayList<>();
+        for (StatutRdv s : StatutRdv.values()) {
+            long nb = em.createQuery(
+                            "SELECT COUNT(r) FROM RendezVous r WHERE r.patient.idPatient = :id AND r.statut = :s", Long.class)
+                    .setParameter("id", idPatient)
+                    .setParameter("s", s)
+                    .getSingleResult();
+            result.add(new String[]{s.name(), String.valueOf(nb)});
         }
         return result;
     }
@@ -603,7 +710,7 @@ public class EtablissementService {
 
         // Patients a traiter
         List<Object[]> patients = em.createQuery(
-                "SELECT r.patient.numeroPatient, r.patient.utilisateur.fullName, r.dateRendez, r.priorite, r.motif, r.idRendez, d.idDossier FROM RendezVous r LEFT JOIN r.patient.dossierMedical d " +
+                "SELECT r.patient.numeroPatient, r.patient.utilisateur.fullName, r.dateRendez, r.priorite, r.motif, r.idRendez, d.idDossier, r.statut FROM RendezVous r LEFT JOIN r.patient.dossierMedical d " +
                         "WHERE r.medecin.idMedecin = :idMedecin AND r.dateRendez >= :debut AND r.dateRendez < :fin AND r.statut IN (:confirme, :demande) ORDER BY r.priorite DESC, r.dateRendez ASC", Object[].class)
                 .setParameter("idMedecin", idMedecin)
                 .setParameter("debut", debutJour)
@@ -625,6 +732,7 @@ public class EtablissementService {
             pm.put("idRendez", row[5]);
             pm.put("idRendezVous", row[5]); // alias for JSP
             pm.put("idDossier", row[6]);
+            pm.put("statut", row[7] != null ? row[7].toString() : "");
             patientsList.add(pm);
         }
         stats.put("patientsATraiter", patientsList);
@@ -647,6 +755,38 @@ public class EtablissementService {
                 .setParameter("versee", com.burundihealthconnect.entity.enums.StatutConsultation.VERSEE_AU_DOSSIER)
                 .getSingleResult();
         stats.put("consultationsVersees", totalConsMedecin > 0 ? (consVerseesMedecin * 100 / totalConsMedecin) : 0);
+
+        // Trends KPI (vs jour précédent)
+        LocalDateTime debutHier = LocalDate.now().minusDays(1).atStartOfDay();
+        LocalDateTime finHier = LocalDate.now().atStartOfDay();
+
+        long rdvHier = em.createQuery(
+                "SELECT COUNT(r) FROM RendezVous r WHERE r.medecin.idMedecin = :id AND r.dateRendez >= :d AND r.dateRendez < :f", Long.class)
+                .setParameter("id", idMedecin).setParameter("d", debutHier).setParameter("f", finHier)
+                .getSingleResult();
+        stats.put("trendRdvDuJour", calculerTrend(rdvDuJour, rdvHier));
+
+        long attenteHier = em.createQuery(
+                "SELECT COUNT(r) FROM RendezVous r WHERE r.medecin.idMedecin = :id AND r.statut = :s AND r.dateRendez >= :d AND r.dateRendez < :f", Long.class)
+                .setParameter("id", idMedecin).setParameter("s", StatutRdv.RDV_DEMANDE).setParameter("d", debutHier).setParameter("f", finHier)
+                .getSingleResult();
+        stats.put("trendRdvEnAttente", calculerTrend(rdvEnAttente, attenteHier));
+
+        long urgentsHier = em.createQuery(
+                "SELECT COUNT(r) FROM RendezVous r WHERE r.medecin.idMedecin = :id AND r.priorite IN (:urgent, :critique) AND r.statut != :annule AND r.dateRendez >= :d AND r.dateRendez < :f", Long.class)
+                .setParameter("id", idMedecin)
+                .setParameter("urgent", com.burundihealthconnect.entity.enums.Priorite.URGENT)
+                .setParameter("critique", com.burundihealthconnect.entity.enums.Priorite.CRITIQUE)
+                .setParameter("annule", StatutRdv.RDV_ANNULE)
+                .setParameter("d", debutHier).setParameter("f", finHier)
+                .getSingleResult();
+        stats.put("trendUrgentsCritiques", calculerTrend(rdvUrgentsCritiques, urgentsHier));
+
+        long consHier = em.createQuery(
+                "SELECT COUNT(c) FROM Consultation c WHERE c.medecin.idMedecin = :id AND c.dateConsultation >= :d AND c.dateConsultation < :f", Long.class)
+                .setParameter("id", idMedecin).setParameter("d", debutHier).setParameter("f", finHier)
+                .getSingleResult();
+        stats.put("trendConsultationsEnCours", calculerTrend(consultationsEnCours, consHier));
 
         return stats;
     }
@@ -745,6 +885,7 @@ public class EtablissementService {
         stats.put("consultationsCeMois", consultationsCeMois);
 
         stats.put("chartConsultations7jours", chartConsultations7jours(idEtablissement));
+        stats.put("chartConsultations30jours", chartConsultations30jours(idEtablissement));
         stats.put("chartRdvStatus", chartRdvStatusAdmin(idEtablissement));
 
         // Enhanced admin stats
@@ -821,8 +962,71 @@ public class EtablissementService {
         stats.put("critiqueCount", critiqueCount);
 
         stats.put("chartTop5Services", chartTop5Services(idEtablissement));
+        stats.put("chartTop5ServicesMois", chartTop5ServicesPeriode(idEtablissement, debutMois, finMois));
+        int trimestre = ((moisCourant.getMonthValue() - 1) / 3) * 3 + 1;
+        LocalDateTime debutTrimestre = YearMonth.of(moisCourant.getYear(), trimestre).atDay(1).atStartOfDay();
+        stats.put("chartTop5ServicesTrimestre", chartTop5ServicesPeriode(idEtablissement, debutTrimestre, finMois));
         stats.put("chartChargeParMedecin", chartChargeParMedecin(idEtablissement));
         stats.put("chartPrioritesRdv", priorites);
+
+        // Congés en attente (badge actions rapides + alerte)
+        long congesEnAttente = em.createQuery(
+                "SELECT COUNT(c) FROM CongeMedecin c " +
+                        "WHERE c.etablissement.idEtablissement = :idEtab AND c.statut = :attente", Long.class)
+                .setParameter("idEtab", idEtablissement)
+                .setParameter("attente", com.burundihealthconnect.entity.enums.StatutConge.EN_ATTENTE)
+                .getSingleResult();
+        stats.put("congesEnAttente", congesEnAttente);
+
+        // RDV sensibles (URGENT / CRITIQUE) encore en demande
+        long rdvCritiquesUrgents = em.createQuery(
+                "SELECT COUNT(r) FROM RendezVous r " +
+                        "WHERE r.etablissement.idEtablissement = :idEtab " +
+                        "AND r.statut = :demande AND (r.priorite = :urgent OR r.priorite = :critique)", Long.class)
+                .setParameter("idEtab", idEtablissement)
+                .setParameter("demande", StatutRdv.RDV_DEMANDE)
+                .setParameter("urgent", com.burundihealthconnect.entity.enums.Priorite.URGENT)
+                .setParameter("critique", com.burundihealthconnect.entity.enums.Priorite.CRITIQUE)
+                .getSingleResult();
+        stats.put("rdvCritiquesUrgents", rdvCritiquesUrgents);
+
+        // Charge détaillée par médecin (nom, spécialité, RDV du mois, id) + max pour échelle
+        List<String[]> chargeMedecins = chartChargeParMedecinDetail(idEtablissement);
+        long maxChargeMedecin = 0;
+        for (String[] m : chargeMedecins) {
+            long nb = Long.parseLong(m[2]);
+            if (nb > maxChargeMedecin) {
+                maxChargeMedecin = nb;
+            }
+        }
+        stats.put("chargeMedecins", chargeMedecins);
+        stats.put("maxChargeMedecin", maxChargeMedecin);
+
+        // Trends KPI (vs jour précédent / vs mois précédent)
+        LocalDateTime debutHier = LocalDate.now().minusDays(1).atStartOfDay();
+        LocalDateTime finHier = LocalDate.now().atStartOfDay();
+
+        long rdvHier = em.createQuery(
+                "SELECT COUNT(r) FROM RendezVous r WHERE r.etablissement.idEtablissement = :id AND r.dateRendez >= :d AND r.dateRendez < :f", Long.class)
+                .setParameter("id", idEtablissement).setParameter("d", debutHier).setParameter("f", finHier)
+                .getSingleResult();
+        stats.put("trendRdvAujourdhui", calculerTrend(rdvAujourdhui, rdvHier));
+
+        long attenteHier = em.createQuery(
+                "SELECT COUNT(r) FROM RendezVous r WHERE r.etablissement.idEtablissement = :id AND r.statut = :s AND r.dateRendez >= :d AND r.dateRendez < :f", Long.class)
+                .setParameter("id", idEtablissement).setParameter("s", StatutRdv.RDV_DEMANDE).setParameter("d", debutHier).setParameter("f", finHier)
+                .getSingleResult();
+        stats.put("trendRdvEnAttente", calculerTrend(rdvEnAttente, attenteHier));
+
+        YearMonth moisPrecedent = YearMonth.now().minusMonths(1);
+        LocalDateTime debutMoisPrec = moisPrecedent.atDay(1).atStartOfDay();
+        LocalDateTime finMoisPrec = moisPrecedent.plusMonths(1).atDay(1).atStartOfDay();
+
+        long consMoisPrec = em.createQuery(
+                "SELECT COUNT(c) FROM Consultation c WHERE c.etablissement.idEtablissement = :id AND c.dateConsultation >= :d AND c.dateConsultation < :f", Long.class)
+                .setParameter("id", idEtablissement).setParameter("d", debutMoisPrec).setParameter("f", finMoisPrec)
+                .getSingleResult();
+        stats.put("trendConsultationsCeMois", calculerTrend(consultationsCeMois, consMoisPrec));
 
         return stats;
     }
@@ -901,6 +1105,76 @@ public class EtablissementService {
         return result;
     }
 
+    private List<String[]> chartConsultations30jours(Long idEtablissement) {
+        List<String[]> result = new ArrayList<>();
+        LocalDate debut = LocalDate.now().minusDays(29);
+        for (int i = 0; i < 30; i++) {
+            LocalDate jour = debut.plusDays(i);
+            LocalDateTime d = jour.atStartOfDay();
+            LocalDateTime f = jour.plusDays(1).atStartOfDay();
+            long nb = em.createQuery(
+                            "SELECT COUNT(c) FROM Consultation c WHERE c.etablissement.idEtablissement = :id AND c.dateConsultation >= :d AND c.dateConsultation < :f", Long.class)
+                    .setParameter("id", idEtablissement)
+                    .setParameter("d", d).setParameter("f", f)
+                    .getSingleResult();
+            result.add(new String[]{String.valueOf(jour.getDayOfMonth()), String.valueOf(nb)});
+        }
+        return result;
+    }
+
+    private List<String[]> chartTop5ServicesPeriode(Long idEtablissement, LocalDateTime debut, LocalDateTime fin) {
+        List<String[]> result = new ArrayList<>();
+        List<Object[]> rows = em.createQuery(
+                "SELECT s.nom, COUNT(r) FROM RendezVous r JOIN r.service s " +
+                        "WHERE s.etablissement.idEtablissement = :idEtab " +
+                        "AND r.dateRendez >= :debut AND r.dateRendez < :fin " +
+                        "GROUP BY s.nom ORDER BY COUNT(r) DESC", Object[].class)
+                .setParameter("idEtab", idEtablissement)
+                .setParameter("debut", debut)
+                .setParameter("fin", fin)
+                .setMaxResults(5)
+                .getResultList();
+        for (Object[] row : rows) {
+            result.add(new String[]{(String) row[0], String.valueOf(row[1])});
+        }
+        return result;
+    }
+
+    private List<String[]> chartChargeParMedecinDetail(Long idEtablissement) {
+        List<String[]> result = new ArrayList<>();
+        YearMonth moisCourant = YearMonth.now();
+        LocalDateTime debutMois = moisCourant.atDay(1).atStartOfDay();
+        LocalDateTime finMois = moisCourant.plusMonths(1).atDay(1).atStartOfDay();
+
+        Map<Long, Long> counts = new HashMap<>();
+        List<Object[]> rows = em.createQuery(
+                "SELECT r.medecin.idMedecin, COUNT(r) FROM RendezVous r " +
+                        "WHERE r.etablissement.idEtablissement = :idEtab " +
+                        "AND r.dateRendez >= :debut AND r.dateRendez < :fin " +
+                        "GROUP BY r.medecin.idMedecin", Object[].class)
+                .setParameter("idEtab", idEtablissement)
+                .setParameter("debut", debutMois)
+                .setParameter("fin", finMois)
+                .getResultList();
+        for (Object[] row : rows) {
+            counts.put(((Number) row[0]).longValue(), ((Number) row[1]).longValue());
+        }
+
+        List<Object[]> medecins = em.createQuery(
+                "SELECT m.idMedecin, m.utilisateur.fullName, m.specialite FROM Medecin m " +
+                        "WHERE m.utilisateur.etablissement.idEtablissement = :idEtab AND m.utilisateur.actif = true " +
+                        "ORDER BY m.utilisateur.fullName ASC", Object[].class)
+                .setParameter("idEtab", idEtablissement)
+                .getResultList();
+        for (Object[] m : medecins) {
+            Long idM = ((Number) m[0]).longValue();
+            long count = counts.getOrDefault(idM, 0L);
+            String spec = m[2] != null ? (String) m[2] : "";
+            result.add(new String[]{ (String) m[1], spec, String.valueOf(count), String.valueOf(idM) });
+        }
+        return result;
+    }
+
     /** SUPER_ADMIN : hôpitaux actifs du réseau, total patients réseau. */
     private Map<String, Object> statistiquesSuperAdmin() {
         Map<String, Object> stats = new HashMap<>();
@@ -973,9 +1247,9 @@ public class EtablissementService {
         stats.put("modifsDossiersMois", modifsDossiersMois);
 
         long referenementsInterHopitaux = em.createQuery(
-                "SELECT COUNT(r) FROM Referenement r WHERE r.dateReferenement >= :debut AND r.dateReferenement < :fin", Long.class)
-                .setParameter("debut", debutMois)
-                .setParameter("fin", finMois)
+                "SELECT COUNT(r) FROM Referenement r WHERE r.dateRef >= :debut AND r.dateRef < :fin", Long.class)
+                .setParameter("debut", moisCourant.atDay(1))
+                .setParameter("fin", moisCourant.plusMonths(1).atDay(1))
                 .getSingleResult();
         stats.put("referenementsInterHopitaux", referenementsInterHopitaux);
 
@@ -1023,6 +1297,29 @@ public class EtablissementService {
                 "SELECT COUNT(s) FROM Service s WHERE s.actif = false", Long.class)
                 .getSingleResult();
         stats.put("servicesInactifs", servicesInactifs);
+
+        // Trends KPI (vs mois précédent)
+        YearMonth moisPrecedent = YearMonth.now().minusMonths(1);
+        LocalDateTime debutMoisPrec = moisPrecedent.atDay(1).atStartOfDay();
+        LocalDateTime finMoisPrec = moisPrecedent.plusMonths(1).atDay(1).atStartOfDay();
+
+        long consMoisPrec = em.createQuery(
+                "SELECT COUNT(c) FROM Consultation c WHERE c.dateConsultation >= :d AND c.dateConsultation < :f", Long.class)
+                .setParameter("d", debutMoisPrec).setParameter("f", finMoisPrec)
+                .getSingleResult();
+        stats.put("trendConsultationsCeMois", calculerTrend(consultationsCeMois, consMoisPrec));
+
+        long rdvMoisPrec = em.createQuery(
+                "SELECT COUNT(r) FROM RendezVous r WHERE r.dateRendez >= :d AND r.dateRendez < :f", Long.class)
+                .setParameter("d", debutMoisPrec).setParameter("f", finMoisPrec)
+                .getSingleResult();
+        stats.put("trendRdvReseauMois", calculerTrend(rdvReseauMois, rdvMoisPrec));
+
+        long accesMoisPrec = em.createQuery(
+                "SELECT COUNT(a) FROM AccesDossier a WHERE a.dateAcces >= :d AND a.dateAcces < :f", Long.class)
+                .setParameter("d", debutMoisPrec).setParameter("f", finMoisPrec)
+                .getSingleResult();
+        stats.put("trendAccesDossiersMois", calculerTrend(accesDossiersMois, accesMoisPrec));
 
         return stats;
     }
@@ -1099,6 +1396,14 @@ public class EtablissementService {
             result.add(new String[]{((Enum) row[0]).name(), String.valueOf(row[1])});
         }
         return result;
+    }
+
+    /** Variation en % entre deux compteurs (pour les trends KPI "vs hier / vs mois"). */
+    private long calculerTrend(long actuel, long precedent) {
+        if (precedent == 0) {
+            return actuel == 0 ? 0 : 100;
+        }
+        return Math.round((actuel - precedent) * 100.0 / precedent);
     }
 
     /** Charge un établissement par id, lève EntiteIntrouvableException si absent. */

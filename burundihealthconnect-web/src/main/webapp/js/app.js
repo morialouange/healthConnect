@@ -1,10 +1,19 @@
 (function () {
     "use strict";
 
-    var THEME_KEY = "bhc-theme";
+    var THEME_KEY = "mc-theme";
+    var SIDEBAR_KEY = "mc-sidebar-collapsed";
+
+    function mettreAJourIconeTheme() {
+        var sombre = document.documentElement.getAttribute("data-theme") === "dark";
+        document.querySelectorAll("[data-theme-toggle] .theme-icon").forEach(function (icone) {
+            icone.textContent = sombre ? "\u2600" : "\u263E";
+        });
+    }
 
     function appliquerTheme(theme) {
         document.documentElement.setAttribute("data-theme", theme);
+        mettreAJourIconeTheme();
     }
 
     function basculerTheme() {
@@ -12,11 +21,6 @@
         var nouveau = actuel === "dark" ? "light" : "dark";
         appliquerTheme(nouveau);
         try { localStorage.setItem(THEME_KEY, nouveau); } catch (e) { }
-        var btn = document.querySelector("[data-theme-toggle]");
-        if (btn) btn.style.transform = "rotate(360deg)";
-        window.setTimeout(function() {
-            if (btn) btn.style.transform = "";
-        }, 300);
     }
 
     function initThemeToggle() {
@@ -24,37 +28,100 @@
         if (bouton) bouton.addEventListener("click", basculerTheme);
     }
 
-    function initRipple() {
-        document.addEventListener("click", function (e) {
-            var btn = e.target.closest(".btn");
-            if (!btn) return;
-            var rect = btn.getBoundingClientRect();
-            var taille = Math.max(rect.width, rect.height);
-            var onde = document.createElement("span");
-            onde.className = "ripple";
-            onde.style.width = onde.style.height = taille + "px";
-            onde.style.left = (e.clientX - rect.left - taille / 2) + "px";
-            onde.style.top = (e.clientY - rect.top - taille / 2) + "px";
-            btn.appendChild(onde);
-            window.setTimeout(function () { onde.remove(); }, 600);
-        });
+    function appliquerEtatTiroir(sidebar, ouvert) {
+        var backdrop = document.querySelector(".sidebar-backdrop");
+        sidebar.classList.toggle("open", ouvert);
+        if (backdrop) backdrop.classList.toggle("open", ouvert);
+        document.body.classList.toggle("sidebar-lock", ouvert);
     }
 
-    function initEntreeEnCascade() {
-        var elements = document.querySelectorAll(".card, .stat-box, .chart-card");
-        elements = Array.prototype.filter.call(elements, function (el) {
-            return el.closest(".auth-wrapper") === null;
+    function mettreAJourIconeSidebar(collapsed) {
+        var btn = document.querySelector(".sidebar-toggle-btn, .collapse-btn");
+        if (!btn) return;
+        var icone = btn.querySelector("[data-lucide]");
+        if (!icone) return;
+        icone.setAttribute("data-lucide", collapsed ? "panel-left-open" : "panel-left-close");
+        if (typeof lucide !== "undefined" && lucide.createIcons) {
+            // Ré-initialisation SANS attributs personnalisés : les valeurs par
+            // défaut de lucide (stroke-width 2, classes .lucide/.icon) sont
+            // conservées. Passer attrs={"stroke-width":0} rendait les icônes
+            // invisibles après le premier clic sur le chevron.
+            lucide.createIcons();
+        }
+    }
+
+    function initSidebarToggle() {
+        var sidebar = document.querySelector(".sidebar");
+        var btn = document.querySelector(".sidebar-toggle-btn");
+        var appShell = document.querySelector(".app-shell");
+        if (!sidebar || !appShell) return;
+
+        var mobileQuery = window.matchMedia("(max-width: 960px)");
+        var drawerOuvert = false;
+
+        function fermerTiroir() { if (drawerOuvert) { drawerOuvert = false; appliquerEtatTiroir(sidebar, false); } }
+
+        function appliquerCollapse(collapsed) {
+            appShell.classList.toggle("collapsed", collapsed);
+            mettreAJourIconeSidebar(collapsed);
+            gererTooltipsRepli(collapsed);
+        }
+
+        function gererTooltipsRepli(collapsed) {
+            document.querySelectorAll(".sidebar .sidebar-item").forEach(function (lien) {
+                if (collapsed) {
+                    var libelle = lien.getAttribute("aria-label");
+                    if (libelle) lien.setAttribute("title", libelle);
+                } else {
+                    lien.removeAttribute("title");
+                }
+            });
+        }
+
+        function relierFermetures() {
+            var backdrop = document.querySelector(".sidebar-backdrop");
+            if (backdrop) backdrop.addEventListener("click", fermerTiroir);
+            var closeBtn = document.querySelector(".sidebar-close");
+            if (closeBtn) closeBtn.addEventListener("click", fermerTiroir);
+            document.querySelectorAll(".sidebar nav a").forEach(function (lien) {
+                lien.addEventListener("click", fermerTiroir);
+            });
+            document.addEventListener("keydown", function (e) {
+                if (e.key === "Escape") fermerTiroir();
+            });
+        }
+
+        if (btn) {
+            btn.addEventListener("click", function () {
+                if (mobileQuery.matches) {
+                    drawerOuvert = !drawerOuvert;
+                    appliquerEtatTiroir(sidebar, drawerOuvert);
+                } else {
+                    var estReplie = !appShell.classList.contains("collapsed");
+                    appliquerCollapse(estReplie);
+                    try { localStorage.setItem(SIDEBAR_KEY, estReplie ? "1" : "0"); } catch (e) { }
+                }
+            });
+        }
+
+        try {
+            if (localStorage.getItem(SIDEBAR_KEY) === "1") {
+                appliquerCollapse(true);
+            } else {
+                mettreAJourIconeSidebar(false);
+            }
+        } catch (e) { }
+
+        mobileQuery.addEventListener("change", function (e) {
+            if (!e.matches) {
+                fermerTiroir();
+                var memorise = false;
+                try { memorise = localStorage.getItem(SIDEBAR_KEY) === "1"; } catch (er) { }
+                appliquerCollapse(memorise);
+            }
         });
-        elements.forEach(function (el, i) {
-            el.classList.add("entrance");
-            el.style.animationDelay = (i * 50) + "ms";
-        });
-        var lignes = document.querySelectorAll("table.table tbody tr");
-        lignes.forEach(function (ligne, i) {
-            ligne.style.opacity = "0";
-            ligne.style.animation = "fade-in-up 360ms var(--ease-water) forwards";
-            ligne.style.animationDelay = (i * 35) + "ms";
-        });
+
+        relierFermetures();
     }
 
     function initPasswordToggle() {
@@ -69,46 +136,19 @@
         });
     }
 
-    // =================================================================
-    // SCROLL REVEAL — IntersectionObserver
-    // =================================================================
-    function initScrollReveal() {
-        if (!window.IntersectionObserver) {
-            document.querySelectorAll(".reveal, .reveal-left, .reveal-right, .reveal-scale")
-                .forEach(function (el) { el.classList.add("visible"); });
-            return;
-        }
-        var obs = new IntersectionObserver(function (entries) {
-            entries.forEach(function (entry) {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add("visible");
-                    obs.unobserve(entry.target);
-                }
-            });
-        }, { threshold: 0.08, rootMargin: "0px 0px -40px 0px" });
-        document.querySelectorAll(".reveal, .reveal-left, .reveal-right, .reveal-scale")
-            .forEach(function (el) { obs.observe(el); });
+    function initCsrf() {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (!meta) return;
+        var token = meta.getAttribute("content");
+        if (!token) return;
+        document.querySelectorAll('form[method="post"]').forEach(function (form) {
+            var input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "csrfToken";
+            input.value = token;
+            form.appendChild(input);
+        });
     }
-
-    // =================================================================
-    // SPINNER — helper overlay
-    // =================================================================
-    window.showSpinner = function (show) {
-        var el = document.getElementById("app-spinner");
-        if (!el && show) {
-            el = document.createElement("div");
-            el.id = "app-spinner";
-            el.className = "overlay-spinner";
-            el.innerHTML = '<div class="spinner"></div>';
-            document.body.appendChild(el);
-            requestAnimationFrame(function () { el.classList.add("active"); });
-        } else if (el && !show) {
-            el.classList.remove("active");
-            setTimeout(function () { el.remove(); }, 200);
-        } else if (el && show) {
-            el.classList.add("active");
-        }
-    };
 
     function initAlertes() {
         document.querySelectorAll(".alerte").forEach(function (a) {
@@ -129,46 +169,51 @@
         });
     }
 
-    function initGreeting() {
-        var el = document.querySelector(".greeting");
-        if (!el) return;
-        var h = new Date().getHours();
-        var msg = h < 12 ? "Bonjour" : h < 17 ? "Bon après-midi" : "Bonsoir";
-        el.textContent = msg;
-    }
-
-    function initCharts() {
-        if (window.bhcCharts && window.bhcCharts._dashboardInit) {
-            window.bhcCharts._dashboardInit();
-        }
-    }
-
-    function initSidebarToggle() {
-        var btn = document.querySelector(".collapse-btn");
-        var sidebar = document.querySelector(".sidebar");
-        if (!btn || !sidebar) return;
-        btn.addEventListener("click", function () {
-            sidebar.classList.toggle("collapsed");
+    function initLangToggle() {
+        var boutons = document.querySelectorAll("#lang-toggle");
+        if (!boutons.length) return;
+        var actuelle = (document.documentElement.getAttribute("lang") || "fr").toLowerCase();
+        var cible = actuelle === "fr" ? "en" : "fr";
+        var libelle = cible === "fr" ? "FR" : "EN";
+        boutons.forEach(function (btn) {
+            btn.querySelectorAll(".lang-label").forEach(function (l) { l.textContent = libelle; });
+            btn.addEventListener("click", function () {
+                var url = new URL(window.location.href);
+                url.searchParams.set("lang", cible);
+                window.location.href = url.pathname + url.search + url.hash;
+            });
         });
     }
 
-    function initCountUp() {
-        document.querySelectorAll(".stat-box .valeur").forEach(function (el) {
-            var texte = el.textContent.trim();
-            var cible = parseInt(texte, 10);
-            if (isNaN(cible) || cible === 0) return;
-            el.textContent = "0";
-            el.style.display = "inline-block";
-            var duree = Math.min(800, 60 + cible * 10);
-            var debut = performance.now();
-            function animer(now) {
-                var p = Math.min(1, (now - debut) / duree);
-                p = 1 - Math.pow(1 - p, 3);
-                el.textContent = Math.round(p * cible);
-                if (p < 1) requestAnimationFrame(animer);
-                else el.classList.add("count-up");
+    window.confirmApp = function (el, evt, message) {
+        if (evt) evt.preventDefault();
+        var executer = function () {
+            if (!el) return;
+            if (el.tagName === "A") { window.location.href = el.getAttribute("href"); }
+            else { var f = el.closest("form"); if (f) f.submit(); }
+        };
+        var backdrop = document.getElementById("confirm-backdrop");
+        if (!backdrop) { executer(); return false; }
+        var msgEl = document.getElementById("confirm-message");
+        if (msgEl) msgEl.textContent = message;
+        backdrop.classList.add("open");
+        var okBtn = document.getElementById("confirm-ok");
+        var cancelBtn = document.getElementById("confirm-cancel");
+        if (okBtn) {
+            okBtn.focus();
+            okBtn.onclick = function () { backdrop.classList.remove("open"); executer(); };
+        }
+        if (cancelBtn) cancelBtn.onclick = function () { backdrop.classList.remove("open"); };
+        backdrop.onclick = function (e) { if (e.target === backdrop) backdrop.classList.remove("open"); };
+        return false;
+    };
+
+    function initConfirmDialog() {
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape") {
+                var b = document.getElementById("confirm-backdrop");
+                if (b) b.classList.remove("open");
             }
-            requestAnimationFrame(animer);
         });
     }
 
@@ -188,9 +233,6 @@
         });
     }
 
-    // =================================================================
-    // ADRESSE CASCADE — Province / Commune / Zone (Burundi)
-    // =================================================================
     var BURUNDI = {
         "Bubanza": {
             "Bubanza": ["Bubanza", "Gihanga", "Mpanda", "Musigati"],
@@ -324,6 +366,22 @@
         });
     }
 
+    function initAuthSubmit() {
+        document.querySelectorAll(".auth-submit").forEach(function (btn) {
+            var form = btn.closest("form");
+            if (!form) return;
+            form.addEventListener("submit", function () {
+                if (form.checkValidity() && !btn.classList.contains("is-loading")) {
+                    btn.classList.add("is-loading");
+                    var spinner = document.createElement("span");
+                    spinner.className = "btn-spinner";
+                    spinner.setAttribute("aria-hidden", "true");
+                    btn.insertBefore(spinner, btn.firstChild);
+                }
+            });
+        });
+    }
+
     function initAddressCascade() {
         var provinceEl = document.getElementById("province");
         var communeEl = document.getElementById("commune");
@@ -332,35 +390,33 @@
         var complementEl = document.getElementById("complementAdresse");
         if (!provinceEl || !communeEl || !zoneEl || !adresseHidden) return;
 
-        // populate provinces
-        peuplerSelect(provinceEl, Object.keys(BURUNDI).sort(), "— Province —");
+        peuplerSelect(provinceEl, Object.keys(BURUNDI).sort(), "\u2014 Province \u2014");
 
         function onProvinceChange() {
             var prov = provinceEl.value;
             communeEl.innerHTML = "";
             zoneEl.innerHTML = "";
             if (!prov) {
-                peuplerSelect(communeEl, [], "— Commune —");
-                peuplerSelect(zoneEl, [], "— Zone —");
+                peuplerSelect(communeEl, [], "\u2014 Commune \u2014");
+                peuplerSelect(zoneEl, [], "\u2014 Zone \u2014");
                 return;
             }
-            peuplerSelect(communeEl, Object.keys(BURUNDI[prov]).sort(), "— Commune —");
+            peuplerSelect(communeEl, Object.keys(BURUNDI[prov]).sort(), "\u2014 Commune \u2014");
         }
 
         function onCommuneChange() {
             var prov = provinceEl.value;
             var comm = communeEl.value;
             if (!prov || !comm) {
-                peuplerSelect(zoneEl, [], "— Zone —");
+                peuplerSelect(zoneEl, [], "\u2014 Zone \u2014");
                 return;
             }
-            peuplerSelect(zoneEl, BURUNDI[prov][comm] || [], "— Zone —");
+            peuplerSelect(zoneEl, BURUNDI[prov][comm] || [], "\u2014 Zone \u2014");
         }
 
         provinceEl.addEventListener("change", onProvinceChange);
         communeEl.addEventListener("change", onCommuneChange);
 
-        // combine into hidden adresse field before submit
         var form = provinceEl.closest("form");
         if (form) {
             form.addEventListener("submit", function () {
@@ -374,203 +430,19 @@
         }
     }
 
-    function initToast() {
-        var alertes = document.querySelectorAll(".alerte-succes");
-        alertes.forEach(function (a, i) {
-            if (a.closest(".auth-wrapper")) return;
-            a.style.position = "fixed";
-            a.style.top = (1 + i * 3.5) + "rem";
-            a.style.right = "1rem";
-            a.style.zIndex = "9999";
-            a.style.minWidth = "280px";
-            a.style.borderRadius = "var(--radius)";
-            a.style.boxShadow = "0 8px 24px rgba(0,0,0,0.12)";
-            a.style.animation = "fade-in-up 400ms var(--ease-water) forwards";
-        });
-    }
-
     // =================================================================
-    // CHART UTILITIES — Canvas API pure, zéro dépendance
-    // =================================================================
-
-    function hexToRgba(hex, a) {
-        var r = parseInt(hex.slice(1,3), 16);
-        var g = parseInt(hex.slice(3,5), 16);
-        var b = parseInt(hex.slice(5,7), 16);
-        return "rgba(" + r + "," + g + "," + b + "," + a + ")";
-    }
-
-    function drawBarChart(canvasId, labels, data, color) {
-        var canvas = document.getElementById(canvasId);
-        if (!canvas) return;
-        var ctx = canvas.getContext("2d");
-        var dpr = window.devicePixelRatio || 1;
-        var rect = canvas.parentElement.getBoundingClientRect();
-        var W = rect.width;
-        var H = 180;
-        canvas.width = W * dpr;
-        canvas.height = H * dpr;
-        canvas.style.width = W + "px";
-        canvas.style.height = H + "px";
-        ctx.scale(dpr, dpr);
-
-        var max = Math.max(1, Math.max.apply(null, data));
-        var pad = { t: 10, b: 20, l: 10, r: 10 };
-        var cw = W - pad.l - pad.r;
-        var ch = H - pad.t - pad.b;
-        var bw = Math.min(40, (cw / data.length) * 0.6);
-        var gap = (cw - bw * data.length) / (data.length + 1);
-
-        ctx.clearRect(0, 0, W, H);
-        data.forEach(function (v, i) {
-            var x = pad.l + gap + i * (bw + gap);
-            var h = (v / max) * ch;
-            var y = pad.t + ch - h;
-            var grad = ctx.createLinearGradient(x, y, x, pad.t + ch);
-            grad.addColorStop(0, color);
-            grad.addColorStop(1, hexToRgba(color, 0.3));
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.moveTo(x + 3, y);
-            ctx.lineTo(x + bw - 3, y);
-            ctx.quadraticCurveTo(x + bw, y, x + bw, y + 3);
-            ctx.lineTo(x + bw, y + h);
-            ctx.lineTo(x, y + h);
-            ctx.lineTo(x, y + 3);
-            ctx.quadraticCurveTo(x, y, x + 3, y);
-            ctx.closePath();
-            ctx.fill();
-            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--text-muted").trim() || "#78716c";
-            ctx.font = "10px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(labels[i], x + bw / 2, pad.t + ch + 14);
-        });
-    }
-
-    function drawDoughnutChart(canvasId, labels, data, colors) {
-        var canvas = document.getElementById(canvasId);
-        if (!canvas) return;
-        var ctx = canvas.getContext("2d");
-        var dpr = window.devicePixelRatio || 1;
-        var size = Math.min(180, canvas.parentElement.clientWidth || 180);
-        canvas.width = size * dpr;
-        canvas.height = size * dpr;
-        canvas.style.width = size + "px";
-        canvas.style.height = size + "px";
-        ctx.scale(dpr, dpr);
-
-        var cx = size / 2, cy = size / 2, r = size * 0.35, ep = size * 0.12;
-        var total = data.reduce(function (a, b) { return a + b; }, 0);
-        if (total === 0) return;
-        var angles = [];
-        data.forEach(function (v) { angles.push((v / total) * Math.PI * 2); });
-        var start = -Math.PI / 2;
-        ctx.clearRect(0, 0, size, size);
-        angles.forEach(function (a, i) {
-            ctx.beginPath();
-            ctx.arc(cx, cy, r, start, start + a);
-            ctx.arc(cx, cy, r - ep, start + a, start, true);
-            ctx.closePath();
-            ctx.fillStyle = colors[i % colors.length];
-            ctx.fill();
-            start += a;
-        });
-        // centre
-        ctx.beginPath();
-        ctx.arc(cx, cy, r - ep - 2, 0, Math.PI * 2);
-        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bg-elevated").trim() || "#fff";
-        ctx.fill();
-    }
-
-    function drawLineChart(canvasId, labels, data, color) {
-        var canvas = document.getElementById(canvasId);
-        if (!canvas) return;
-        var ctx = canvas.getContext("2d");
-        var dpr = window.devicePixelRatio || 1;
-        var rect = canvas.parentElement.getBoundingClientRect();
-        var W = rect.width;
-        var H = 180;
-        canvas.width = W * dpr;
-        canvas.height = H * dpr;
-        canvas.style.width = W + "px";
-        canvas.style.height = H + "px";
-        ctx.scale(dpr, dpr);
-
-        var max = Math.max(1, Math.max.apply(null, data));
-        var pad = { t: 10, b: 20, l: 10, r: 10 };
-        var cw = W - pad.l - pad.r;
-        var ch = H - pad.t - pad.b;
-        var step = cw / Math.max(1, data.length - 1);
-
-        ctx.clearRect(0, 0, W, H);
-        ctx.beginPath();
-        var points = data.map(function (v, i) {
-            return { x: pad.l + i * step, y: pad.t + ch - (v / max) * ch };
-        });
-        points.forEach(function (p, i) {
-            if (i === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
-        });
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2.5;
-        ctx.lineJoin = "round";
-        ctx.stroke();
-
-        // fill
-        ctx.lineTo(points[points.length - 1].x, pad.t + ch);
-        ctx.lineTo(points[0].x, pad.t + ch);
-        ctx.closePath();
-        var grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ch);
-        grad.addColorStop(0, hexToRgba(color, 0.15));
-        grad.addColorStop(1, hexToRgba(color, 0.01));
-        ctx.fillStyle = grad;
-        ctx.fill();
-
-        // dots
-        points.forEach(function (p) {
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--bg-elevated").trim() || "#fff";
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        });
-
-        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--text-muted").trim() || "#78716c";
-        ctx.font = "10px sans-serif";
-        ctx.textAlign = "center";
-        data.forEach(function (v, i) {
-            ctx.fillText(labels[i], pad.l + i * step, pad.t + ch + 14);
-        });
-    }
-
-    // =================================================================
-    // INIT CHARTS — appelé par chaque dashboard
-    // =================================================================
-    window.bhcCharts = {
-        bar: drawBarChart,
-        doughnut: drawDoughnutChart,
-        line: drawLineChart,
-        initCountUp: initCountUp
-    };
-
-    // =================================================================
-    // INIT GÉNÉRALE
+    // INIT GENERALE
     // =================================================================
     document.addEventListener("DOMContentLoaded", function () {
+        initCsrf();
         initThemeToggle();
-        initRipple();
-        initEntreeEnCascade();
+        initSidebarToggle();
         initPasswordToggle();
         initAlertes();
-        initGreeting();
-        initSidebarToggle();
-        initCountUp();
+        initLangToggle();
+        initConfirmDialog();
         initPhoneInput();
+        initAuthSubmit();
         initAddressCascade();
-        initScrollReveal();
-        initToast();
-        initCharts();
     });
 })();

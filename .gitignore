@@ -1,0 +1,48 @@
+# --- Maven / Java build ---
+target/
+*.class
+*.war
+*.ear
+*.jar
+
+# --- IDE ---
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+nbactions.xml
+nb-configuration.xml
+
+# --- Éditeurs / fichiers temporaires ---
+*.swp
+*.swo
+*~
+*.tmp
+*.bak
+*.orig
+*.old
+
+# --- Système ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Logs ---
+*.log
+hs_err_pid*.log
+replay_pid*.log
+
+# --- Archives ---
+*.zip
+*.tar.gz
+
+# --- Sauvegardes locales ---
+backups/
+
+# --- Documents OpenOffice / LibreOffice ---
+*.odt
+*.ods
+*.odp

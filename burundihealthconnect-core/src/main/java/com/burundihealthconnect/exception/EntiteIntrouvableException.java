@@ -10,4 +10,8 @@ public class EntiteIntrouvableException extends BusinessException {
     public EntiteIntrouvableException(String entite, Long id) {
         super(entite + " introuvable avec l'identifiant : " + id);
     }
+
+    public EntiteIntrouvableException(String entite, String id) {
+        super(entite + " introuvable avec l'identifiant : " + id);
+    }
 }

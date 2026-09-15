@@ -22,7 +22,6 @@ import com.burundihealthconnect.exception.BusinessException;
 import com.burundihealthconnect.util.SessionKeys;
 
 import jakarta.inject.Inject;
-import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -32,10 +31,9 @@ import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * MedecinServlet — @WebServlet("/medecin/*")
@@ -99,8 +97,6 @@ public class MedecinServlet extends HttpServlet {
             afficherDashboard(request, response, idMedecin, idEtablissement);
         } else if ("/rdv".equals(pathInfo)) {
             afficherRdv(request, response, idMedecin, idEtablissement);
-        } else if ("/dossier".equals(pathInfo) && "medecins".equals(request.getParameter("ajax"))) {
-            repondreMedecinsParEtablissement(request, response);
         } else if ("/dossier".equals(pathInfo)) {
             afficherDossier(request, response, idMedecin, idEtablissement);
         } else if ("/historique".equals(pathInfo)) {
@@ -182,7 +178,7 @@ public class MedecinServlet extends HttpServlet {
         Map<String, Object> stats = etablissementService.getStatistiques(Role.MEDECIN, idMedecin, idEtablissement);
         request.setAttribute("stats", stats);
         request.setAttribute("rdvParPriorite", rendezVousService.getRdvParPriorite(idEtablissement));
-        forward(request, response, "/WEB-INF/views/medecin/dashboard.jsp");
+        ServletUtils.forward(request, response, "/WEB-INF/views/medecin/dashboard.jsp");
     }
 
     // =========================================================
@@ -192,7 +188,7 @@ public class MedecinServlet extends HttpServlet {
     private void afficherRdv(HttpServletRequest request, HttpServletResponse response,
                               Long idMedecin, Long idEtablissement)
             throws ServletException, IOException {
-        int page = parseIntOuZero(request.getParameter("page"));
+        int page = ServletUtils.parseIntOuZero(request.getParameter("page"));
         String filtre = request.getParameter("filtre");
 
         List<RendezVous> rdv = rendezVousService.getRdvParMedecin(idMedecin, idEtablissement, page, filtre);
@@ -200,55 +196,55 @@ public class MedecinServlet extends HttpServlet {
         request.setAttribute("page", page);
         request.setAttribute("filtre", filtre);
         long totalCount = rendezVousService.countRdvParMedecin(idMedecin, filtre);
-        int totalPages = (int) Math.ceil((double) totalCount / 10);
+        int totalPages = (int) Math.ceil((double) totalCount / ServletUtils.TAILLE_PAGE);
         request.setAttribute("totalPages", totalPages);
-        forward(request, response, "/WEB-INF/views/medecin/rdv-liste.jsp");
+        ServletUtils.forward(request, response, "/WEB-INF/views/medecin/rdv-liste.jsp");
     }
 
     private void traiterConfirmerRdv(HttpServletRequest request, HttpServletResponse response, Long idMedecin)
             throws IOException {
-        Long idRendezVous = parseLongOuNull(request.getParameter("idRendezVous"));
+        Long idRendezVous = ServletUtils.parseLongOuNull(request.getParameter("idRendezVous"));
         try {
             rendezVousService.confirmerRdv(idRendezVous, idMedecin);
             response.sendRedirect(request.getContextPath() + "/medecin/rdv?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/medecin/rdv", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/rdv", e.getMessage());
         }
     }
 
     private void traiterRefuserRdv(HttpServletRequest request, HttpServletResponse response, Long idMedecin)
             throws IOException {
-        Long idRendezVous = parseLongOuNull(request.getParameter("idRendezVous"));
+        Long idRendezVous = ServletUtils.parseLongOuNull(request.getParameter("idRendezVous"));
         try {
             rendezVousService.refuserRdv(idRendezVous, idMedecin);
             response.sendRedirect(request.getContextPath() + "/medecin/rdv?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/medecin/rdv", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/rdv", e.getMessage());
         }
     }
 
     private void traiterTerminerRdv(HttpServletRequest request, HttpServletResponse response, Long idMedecin)
             throws IOException {
-        Long idRendezVous = parseLongOuNull(request.getParameter("idRendezVous"));
+        Long idRendezVous = ServletUtils.parseLongOuNull(request.getParameter("idRendezVous"));
         try {
             rendezVousService.marquerTermine(idRendezVous, idMedecin);
             response.sendRedirect(request.getContextPath() + "/medecin/rdv?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/medecin/rdv", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/rdv", e.getMessage());
         }
     }
 
     /** L16 — Le médecin change la priorité d'un RDV. */
     private void traiterChangerPriorite(HttpServletRequest request, HttpServletResponse response, Long idMedecin)
             throws IOException {
-        Long idRendezVous = parseLongOuNull(request.getParameter("idRendezVous"));
+        Long idRendezVous = ServletUtils.parseLongOuNull(request.getParameter("idRendezVous"));
         String prioriteStr = request.getParameter("priorite");
         try {
             Priorite priorite = Priorite.valueOf(prioriteStr);
             rendezVousService.changerPriorite(idRendezVous, idMedecin, priorite);
             response.sendRedirect(request.getContextPath() + "/medecin/dashboard?succes=1");
         } catch (BusinessException | IllegalArgumentException e) {
-            redirigerAvecErreur(request, response, "/medecin/dashboard", "Priorité invalide ou RDV introuvable.");
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/dashboard", "Priorité invalide ou RDV introuvable.");
         }
     }
 
@@ -261,7 +257,7 @@ public class MedecinServlet extends HttpServlet {
             throws ServletException, IOException {
         String numeroPatient = request.getParameter("numeroPatient");
         if (numeroPatient == null || numeroPatient.isBlank()) {
-            forward(request, response, "/WEB-INF/views/medecin/dossier-recherche.jsp");
+            ServletUtils.forward(request, response, "/WEB-INF/views/medecin/dossier-recherche.jsp");
             return;
         }
 
@@ -274,23 +270,23 @@ public class MedecinServlet extends HttpServlet {
 
             request.setAttribute("dossier", dossier);
             request.setAttribute("historique", dossierService.getHistoriqueComplet(dossier.getIdDossier()));
-            forward(request, response, "/WEB-INF/views/medecin/dossier-detail.jsp");
+            ServletUtils.forward(request, response, "/WEB-INF/views/medecin/dossier-detail.jsp");
 
         } catch (BusinessException e) {
             request.setAttribute("erreur", e.getMessage());
-            forward(request, response, "/WEB-INF/views/medecin/dossier-recherche.jsp");
+            ServletUtils.forward(request, response, "/WEB-INF/views/medecin/dossier-recherche.jsp");
         }
     }
 
     private void afficherHistorique(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        Long idDossier = parseLongOuNull(request.getParameter("idDossier"));
+        Long idDossier = ServletUtils.parseLongOuNull(request.getParameter("idDossier"));
         if (idDossier == null) {
             response.sendRedirect(request.getContextPath() + "/medecin/dossier");
             return;
         }
         request.setAttribute("historique", dossierService.getHistoriqueModifications(idDossier));
-        forward(request, response, "/WEB-INF/views/medecin/historique.jsp");
+        ServletUtils.forward(request, response, "/WEB-INF/views/medecin/historique.jsp");
     }
 
     // =========================================================
@@ -300,24 +296,24 @@ public class MedecinServlet extends HttpServlet {
     private void traiterCreerConsultation(HttpServletRequest request, HttpServletResponse response,
                                             Long idMedecin, Long idEtablissement)
             throws ServletException, IOException {
-        Long idRendezVous = parseLongOuNull(request.getParameter("idRendezVous"));
-        Long idDossier = parseLongOuNull(request.getParameter("idDossier"));
+        Long idRendezVous = ServletUtils.parseLongOuNull(request.getParameter("idRendezVous"));
+        Long idDossier = ServletUtils.parseLongOuNull(request.getParameter("idDossier"));
         String notes = request.getParameter("notes");
         String diagnostic = request.getParameter("diagnostic");
 
         if (idDossier == null) {
-            redirigerAvecErreur(request, response, "/medecin/dossier", "Dossier introuvable pour cette consultation.");
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/dossier", "Dossier introuvable pour cette consultation.");
             return;
         }
-        if (!isValidMaxLength(notes, 500)) {
-            redirigerAvecErreur(request, response, "/medecin/dossier",
-                    message(request, "error.validation.maxlength")
+        if (!ServletUtils.isValidMaxLength(notes, 500)) {
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/dossier",
+                    ServletUtils.message(request, "error.validation.maxlength")
                             .replace("{0}", "Notes").replace("{1}", "500"));
             return;
         }
-        if (!isValidMaxLength(diagnostic, 500)) {
-            redirigerAvecErreur(request, response, "/medecin/dossier",
-                    message(request, "error.validation.maxlength")
+        if (!ServletUtils.isValidMaxLength(diagnostic, 500)) {
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/dossier",
+                    ServletUtils.message(request, "error.validation.maxlength")
                             .replace("{0}", "Diagnostic").replace("{1}", "500"));
             return;
         }
@@ -328,21 +324,21 @@ public class MedecinServlet extends HttpServlet {
             response.sendRedirect(request.getContextPath()
                     + "/medecin/consultations?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/medecin/dossier", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/dossier", e.getMessage());
         }
     }
 
     private void traiterChangerStatutConsultation(HttpServletRequest request, HttpServletResponse response,
                                                    Long idMedecin)
             throws IOException {
-        Long idConsultation = parseLongOuNull(request.getParameter("idConsultation"));
+        Long idConsultation = ServletUtils.parseLongOuNull(request.getParameter("idConsultation"));
         String statutStr = request.getParameter("statut");
         try {
             StatutConsultation statut = StatutConsultation.valueOf(statutStr);
             consultationService.changerStatut(idConsultation, idMedecin, statut);
             response.sendRedirect(request.getContextPath() + "/medecin/consultations?succes=1");
         } catch (BusinessException | IllegalArgumentException e) {
-            redirigerAvecErreur(request, response, "/medecin/consultations", "Transition de statut invalide.");
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/consultations", "Transition de statut invalide.");
         }
     }
 
@@ -353,7 +349,7 @@ public class MedecinServlet extends HttpServlet {
     /** GET — Affiche le formulaire d'ordonnance pour une consultation donnée. */
     private void afficherFormulaireOrdonnance(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        Long idConsultation = parseLongOuNull(request.getParameter("idConsultation"));
+        Long idConsultation = ServletUtils.parseLongOuNull(request.getParameter("idConsultation"));
         if (idConsultation == null) {
             response.sendRedirect(request.getContextPath() + "/medecin/rdv");
             return;
@@ -361,20 +357,20 @@ public class MedecinServlet extends HttpServlet {
         try {
             Consultation consultation = consultationService.getConsultationById(idConsultation);
             request.setAttribute("consultation", consultation);
-            forward(request, response, "/WEB-INF/views/medecin/ordonnance.jsp");
+            ServletUtils.forward(request, response, "/WEB-INF/views/medecin/ordonnance.jsp");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/medecin/rdv", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/rdv", e.getMessage());
         }
     }
 
     private void traiterCreerOrdonnance(HttpServletRequest request, HttpServletResponse response)
             throws IOException {
-        Long idConsultation = parseLongOuNull(request.getParameter("idConsultation"));
+        Long idConsultation = ServletUtils.parseLongOuNull(request.getParameter("idConsultation"));
         String instructions = request.getParameter("instructions");
 
-        if (!isValidMaxLength(instructions, 500)) {
-            redirigerAvecErreur(request, response, "/medecin/ordonnances",
-                    message(request, "error.validation.maxlength")
+        if (!ServletUtils.isValidMaxLength(instructions, 500)) {
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/ordonnances",
+                    ServletUtils.message(request, "error.validation.maxlength")
                             .replace("{0}", "Instructions").replace("{1}", "500"));
             return;
         }
@@ -392,7 +388,7 @@ public class MedecinServlet extends HttpServlet {
                 if (medicaments[i] == null || medicaments[i].isBlank()) {
                     continue;
                 }
-                Integer dureeJours = parseIntOuNull(durees != null && i < durees.length ? durees[i] : null);
+                Integer dureeJours = ServletUtils.parseIntOuNull(durees != null && i < durees.length ? durees[i] : null);
                 lignes.add(new ConsultationService.LignePrescriptionDTO(
                         medicaments[i], dosages[i], frequences[i], dureeJours));
             }
@@ -406,7 +402,7 @@ public class MedecinServlet extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/medecin/ordonnances?succes=1" + parametreAlerte);
 
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/medecin/ordonnances", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/ordonnances", e.getMessage());
         }
     }
 
@@ -417,7 +413,7 @@ public class MedecinServlet extends HttpServlet {
     private void afficherFormulaireCreationConsultation(HttpServletRequest request, HttpServletResponse response,
                                                          Long idMedecin)
             throws ServletException, IOException {
-        Long idRendezVous = parseLongOuNull(request.getParameter("idRendezVous"));
+        Long idRendezVous = ServletUtils.parseLongOuNull(request.getParameter("idRendezVous"));
         if (idRendezVous == null) {
             response.sendRedirect(request.getContextPath() + "/medecin/rdv");
             return;
@@ -425,22 +421,22 @@ public class MedecinServlet extends HttpServlet {
         try {
             RendezVous rdv = rendezVousService.getRendezVousById(idRendezVous, idMedecin);
             request.setAttribute("rdv", rdv);
-            forward(request, response, "/WEB-INF/views/medecin/consultation-creer.jsp");
+            ServletUtils.forward(request, response, "/WEB-INF/views/medecin/consultation-creer.jsp");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/medecin/rdv", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/rdv", e.getMessage());
         }
     }
 
     private void afficherConsultations(HttpServletRequest request, HttpServletResponse response,
                                         Long idMedecin, Long idEtablissement)
             throws ServletException, IOException {
-        int page = parseIntOuZero(request.getParameter("page"));
+        int page = ServletUtils.parseIntOuZero(request.getParameter("page"));
         request.setAttribute("consultations", consultationService.getConsultationsByMedecin(idMedecin, page));
         request.setAttribute("page", page);
         long totalCount = consultationService.countConsultationsByMedecin(idMedecin);
-        int totalPages = (int) Math.ceil((double) totalCount / 10);
+        int totalPages = (int) Math.ceil((double) totalCount / ServletUtils.TAILLE_PAGE);
         request.setAttribute("totalPages", totalPages);
-        forward(request, response, "/WEB-INF/views/medecin/consultations-liste.jsp");
+        ServletUtils.forward(request, response, "/WEB-INF/views/medecin/consultations-liste.jsp");
     }
 
     // =========================================================
@@ -450,39 +446,45 @@ public class MedecinServlet extends HttpServlet {
     private void afficherReferenements(HttpServletRequest request, HttpServletResponse response,
                                         Long idMedecin)
             throws ServletException, IOException {
-        int page = parseIntOuZero(request.getParameter("page"));
+        int page = ServletUtils.parseIntOuZero(request.getParameter("page"));
         request.setAttribute("referenements", referenementService.getReferenementsParMedecin(idMedecin, page));
         request.setAttribute("page", page);
         long totalCount = referenementService.countReferenementsParMedecin(idMedecin);
-        int totalPages = (int) Math.ceil((double) totalCount / 10);
+        int totalPages = (int) Math.ceil((double) totalCount / ServletUtils.TAILLE_PAGE);
         request.setAttribute("totalPages", totalPages);
-        forward(request, response, "/WEB-INF/views/medecin/referenements-liste.jsp");
+        ServletUtils.forward(request, response, "/WEB-INF/views/medecin/referenements-liste.jsp");
     }
 
     private void afficherFormulaireReferenement(HttpServletRequest request, HttpServletResponse response,
                                                  Long idMedecin, Long idEtablissement)
             throws ServletException, IOException {
-        Long idConsultation = parseLongOuNull(request.getParameter("idConsultation"));
+        Long idConsultation = ServletUtils.parseLongOuNull(request.getParameter("idConsultation"));
         if (idConsultation == null) {
             response.sendRedirect(request.getContextPath() + "/medecin/consultations");
             return;
         }
         request.setAttribute("consultation", consultationService.getConsultationById(idConsultation));
-        request.setAttribute("hopitaux", etablissementService.getAllSauf(idEtablissement));
-        forward(request, response, "/WEB-INF/views/medecin/referenement-creer.jsp");
+        List<EtablissementSante> hopitaux = etablissementService.getAllSauf(idEtablissement);
+        request.setAttribute("hopitaux", hopitaux);
+        Map<Long, List<Medecin>> medecinsParEtab = new LinkedHashMap<>();
+        for (EtablissementSante h : hopitaux) {
+            medecinsParEtab.put(h.getIdEtablissement(), etablissementService.getMedecinsByEtablissement(h.getIdEtablissement()));
+        }
+        request.setAttribute("medecinsParEtablissement", medecinsParEtab);
+        ServletUtils.forward(request, response, "/WEB-INF/views/medecin/referenement-creer.jsp");
     }
 
     private void traiterCreerReferenement(HttpServletRequest request, HttpServletResponse response,
                                            Long idMedecin)
             throws IOException {
-        Long idConsultation = parseLongOuNull(request.getParameter("idConsultation"));
-        Long idEtablissementDest = parseLongOuNull(request.getParameter("idEtablissementDest"));
-        Long idMedecinDest = parseLongOuNull(request.getParameter("idMedecinDest"));
+        Long idConsultation = ServletUtils.parseLongOuNull(request.getParameter("idConsultation"));
+        Long idEtablissementDest = ServletUtils.parseLongOuNull(request.getParameter("idEtablissementDest"));
+        Long idMedecinDest = ServletUtils.parseLongOuNull(request.getParameter("idMedecinDest"));
         String motif = request.getParameter("motif");
 
         if (idConsultation == null || idEtablissementDest == null || motif == null || motif.isBlank()) {
-            redirigerAvecErreur(request, response, "/medecin/referenements",
-                    message(request, "message.error.required_fields"));
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/referenements",
+                    ServletUtils.message(request, "message.error.required_fields"));
             return;
         }
 
@@ -490,7 +492,7 @@ public class MedecinServlet extends HttpServlet {
             referenementService.creerReferenement(idConsultation, idEtablissementDest, idMedecinDest, motif);
             response.sendRedirect(request.getContextPath() + "/medecin/referenements?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/medecin/referenements", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/referenements", e.getMessage());
         }
     }
 
@@ -500,15 +502,15 @@ public class MedecinServlet extends HttpServlet {
 
     private void afficherOrdonnances(HttpServletRequest request, HttpServletResponse response, Long idMedecin)
             throws ServletException, IOException {
-        int page = parseIntOuZero(request.getParameter("page"));
+        int page = ServletUtils.parseIntOuZero(request.getParameter("page"));
         String filtre = request.getParameter("filtre");
         request.setAttribute("ordonnances", ordonnanceService.getOrdonnancesByMedecin(idMedecin, filtre, page));
         request.setAttribute("filtre", filtre);
         request.setAttribute("page", page);
         long totalCount = ordonnanceService.countOrdonnancesByMedecin(idMedecin, filtre);
-        int totalPages = (int) Math.ceil((double) totalCount / 10);
+        int totalPages = (int) Math.ceil((double) totalCount / ServletUtils.TAILLE_PAGE);
         request.setAttribute("totalPages", totalPages);
-        forward(request, response, "/WEB-INF/views/medecin/ordonnances-liste.jsp");
+        ServletUtils.forward(request, response, "/WEB-INF/views/medecin/ordonnances-liste.jsp");
     }
 
     // =========================================================
@@ -517,13 +519,13 @@ public class MedecinServlet extends HttpServlet {
 
     private void afficherNotifications(HttpServletRequest request, HttpServletResponse response, Long idUtilisateur)
             throws ServletException, IOException {
-        int page = parseIntOuZero(request.getParameter("page"));
+        int page = ServletUtils.parseIntOuZero(request.getParameter("page"));
         request.setAttribute("notifications", notificationService.getToutes(idUtilisateur, page));
         request.setAttribute("page", page);
         long totalCount = notificationService.countToutes(idUtilisateur);
-        int totalPages = (int) Math.ceil((double) totalCount / 10);
+        int totalPages = (int) Math.ceil((double) totalCount / ServletUtils.TAILLE_PAGE);
         request.setAttribute("totalPages", totalPages);
-        forward(request, response, "/WEB-INF/views/medecin/notifications.jsp");
+        ServletUtils.forward(request, response, "/WEB-INF/views/medecin/notifications.jsp");
     }
 
     // =========================================================
@@ -535,7 +537,7 @@ public class MedecinServlet extends HttpServlet {
         int page = 0;
         request.setAttribute("conges", congeService.getMesDemandes(idMedecin, page));
         request.setAttribute("page", page);
-        forward(request, response, "/WEB-INF/views/medecin/conge.jsp");
+        ServletUtils.forward(request, response, "/WEB-INF/views/medecin/conge.jsp");
     }
 
     private void traiterDemanderConge(HttpServletRequest request, HttpServletResponse response,
@@ -546,7 +548,7 @@ public class MedecinServlet extends HttpServlet {
         String motif = request.getParameter("motif");
 
         if (dateDebutStr == null || dateFinStr == null) {
-            redirigerAvecErreur(request, response, "/medecin/conge", "Veuillez indiquer les dates de début et fin.");
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/conge", "Veuillez indiquer les dates de début et fin.");
             return;
         }
 
@@ -556,112 +558,7 @@ public class MedecinServlet extends HttpServlet {
             congeService.demanderConge(idMedecin, idEtablissement, dateDebut, dateFin, motif);
             response.sendRedirect(request.getContextPath() + "/medecin/conge?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/medecin/conge", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/medecin/conge", e.getMessage());
         }
-    }
-
-    // =========================================================
-    // AJAX — Médecins d'un établissement
-    // =========================================================
-
-    private void repondreMedecinsParEtablissement(HttpServletRequest request, HttpServletResponse response)
-            throws IOException {
-        Long idEtablissement = parseLongOuNull(request.getParameter("idEtablissement"));
-        response.setContentType("application/json;charset=UTF-8");
-        if (idEtablissement == null) {
-            response.getWriter().write("[]");
-            return;
-        }
-        List<Medecin> medecins = etablissementService.getMedecinsByEtablissement(idEtablissement);
-        StringBuilder json = new StringBuilder("[");
-        boolean premier = true;
-        for (Medecin m : medecins) {
-            if (!premier) json.append(",");
-            json.append("{\"id\":").append(m.getIdMedecin())
-                .append(",\"nom\":\"").append(escJson(m.getUtilisateur().getFullName())).append("\"}");
-            premier = false;
-        }
-        json.append("]");
-        response.getWriter().write(json.toString());
-    }
-
-    private String escJson(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
-    }
-
-    // =========================================================
-    // VALIDATION
-    // =========================================================
-
-    private static final Pattern EMAIL_PATTERN =
-        Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
-    private static final int MAX_LENGTH = 100;
-
-    private boolean isValidEmail(String email) {
-        return email != null && EMAIL_PATTERN.matcher(email).matches();
-    }
-
-    private boolean isValidTelephone(String telephone) {
-        return telephone == null || telephone.isBlank() || telephone.replaceAll("[^0-9]", "").length() >= 8
-            && telephone.replaceAll("[^0-9]", "").length() <= 15;
-    }
-
-    private boolean isValidMaxLength(String valeur, int max) {
-        return valeur == null || valeur.length() <= max;
-    }
-
-    private boolean isExperienceValide(String experienceStr) {
-        if (experienceStr == null || experienceStr.isBlank()) return true;
-        try {
-            return Integer.parseInt(experienceStr.replaceAll("[^0-9\\-]", "")) >= 0;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
-    // =========================================================
-    // UTILITAIRES
-    // =========================================================
-
-    private void redirigerAvecErreur(HttpServletRequest request, HttpServletResponse response,
-                                      String url, String message) throws IOException {
-        response.sendRedirect(request.getContextPath() + url + "?erreur="
-                + java.net.URLEncoder.encode(message, java.nio.charset.StandardCharsets.UTF_8));
-    }
-
-    private Long parseLongOuNull(String valeur) {
-        try {
-            return (valeur == null || valeur.isBlank()) ? null : Long.parseLong(valeur);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private Integer parseIntOuNull(String valeur) {
-        try {
-            return (valeur == null || valeur.isBlank()) ? null : Integer.parseInt(valeur);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private int parseIntOuZero(String valeur) {
-        Integer resultat = parseIntOuNull(valeur);
-        return resultat == null ? 0 : resultat;
-    }
-
-    private String message(HttpServletRequest request, String key) {
-        String lang = (String) request.getSession().getAttribute("langue");
-        if (lang == null) lang = "fr";
-        Locale locale = Locale.forLanguageTag(lang);
-        java.util.ResourceBundle bundle = java.util.ResourceBundle.getBundle("com.burundihealthconnect.i18n.messages", locale);
-        return bundle.getString(key);
-    }
-
-    private void forward(HttpServletRequest request, HttpServletResponse response, String vue)
-            throws ServletException, IOException {
-        RequestDispatcher dispatcher = request.getRequestDispatcher(vue);
-        dispatcher.forward(request, response);
     }
 }

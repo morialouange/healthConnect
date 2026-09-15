@@ -15,10 +15,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.util.Base64;
 
 /**
  * FiltreSecurite — @WebFilter("/*") appliqué sur TOUTE l'application.
- * Trois responsabilités, dans cet ordre strict :
+ * Quatre responsabilités, dans cet ordre strict :
+ *   0. Protection CSRF (jeton de session validé sur toute requête modifiante)
  *   1. Laisser passer les ressources publiques (login, register, assets statiques)
  *   2. Vérifier qu'une HttpSession valide existe — sinon redirection /auth
  *   3. Vérifier profil_complete — sinon redirection /profil/completer
@@ -28,13 +33,18 @@ import java.io.IOException;
 @WebFilter("/*")
 public class FiltreSecurite implements Filter {
 
+    /** Attribut de requête lu par les vues JSP pour afficher le rôle courant. */
+    private static final String ATTRIBUT_ROLE_CODE = "roleCode";
+
     @Inject
     private NotificationService notificationService;
 
     /** URLs accessibles SANS connexion (page de login/register + ressources statiques). */
     private static final String[] URLS_PUBLIQUES = {
-            "/auth", "/index.jsp", "/", "/css/", "/js/", "/images/"
+            "/auth", "/index.jsp", "/css/", "/js/", "/images/", "/resources/"
     };
+
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
@@ -47,7 +57,21 @@ public class FiltreSecurite implements Filter {
         String contextPath = request.getContextPath();
         String chemin = uri.substring(contextPath.length()); // ex: /admin/dashboard
 
-        // 1) RESSOURCES PUBLIQUES — on laisse passer sans vérification
+        // 0) PROTECTION CSRF — vaut aussi pour les pages publiques (login/register)
+        if (!estRessourceStatique(chemin)) {
+            if (estMethodeModifiante(request.getMethod())) {
+                if (!validerTokenCSRF(request)) {
+                    response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                            "Jeton de sécurité invalide ou expiré. Rechargez la page puis réessayez.");
+                    return;
+                }
+            }
+            // Le jeton est exposé à la vue (meta name="csrf-token") pour toutes
+            // les pages non statiques, y compris lors d'un re-rendu après erreur.
+            request.setAttribute(SessionKeys.CSRF_TOKEN, assurerTokenCSRF(request));
+        }
+
+        // 1) RESSOURCES PUBLIQUES — on laisse passer sans authentification
         if (estUrlPublique(chemin)) {
             chain.doFilter(req, res);
             return;
@@ -64,6 +88,17 @@ public class FiltreSecurite implements Filter {
 
         Role role = (Role) session.getAttribute(SessionKeys.ROLE);
         Boolean profilComplete = (Boolean) session.getAttribute(SessionKeys.PROFIL_COMPLETE);
+
+// Les comparaisons et les clÃ©s i18n des JSP doivent utiliser une chaÃ®ne,
+        // pas l'objet Enum placÃ© en session pour les contrÃ´les de sÃ©curitÃ©.
+        request.setAttribute(ATTRIBUT_ROLE_CODE, role != null ? role.name() : "");
+
+        // Salutation contextuelle (matin / après-midi / soir) pour l'en-tête des pages.
+        // Calculée ici (couche métier/sécurité, Java autorisé) plutôt que dans la JSP
+        // afin de respecter la règle « zéro scriptlet » imposée par le cahier des charges.
+        int heure = java.time.LocalTime.now().getHour();
+        request.setAttribute("salutationCle",
+                heure < 12 ? "greeting.morning" : (heure < 17 ? "greeting.afternoon" : "greeting.evening"));
 
         // 3) PROFIL COMPLETE ?
         boolean profilRequis = (role == Role.PATIENT || role == Role.MEDECIN);
@@ -93,12 +128,56 @@ public class FiltreSecurite implements Filter {
     }
 
     private boolean estUrlPublique(String chemin) {
+        // La racine exacte de l'application ("/") est publique : welcome-file vers index.jsp.
+        if (chemin.isEmpty() || "/".equals(chemin)) {
+            return true;
+        }
         for (String url : URLS_PUBLIQUES) {
             if (chemin.equals(url) || (url.endsWith("/") && chemin.startsWith(url))) {
                 return true;
             }
         }
         return false;
+    }
+
+    /** Ressources statiques (CSS/JS/images) : inutile de les protéger ou d'exposer un jeton. */
+    private boolean estRessourceStatique(String chemin) {
+        return chemin.startsWith("/css/") || chemin.startsWith("/js/") || chemin.startsWith("/images/") || chemin.startsWith("/resources/");
+    }
+
+    /** Méthodes HTTP qui modifient l'état du serveur et doivent donc être protégées. */
+    private boolean estMethodeModifiante(String methode) {
+        return "POST".equals(methode) || "PUT".equals(methode)
+                || "PATCH".equals(methode) || "DELETE".equals(methode);
+    }
+
+    /** Récupère le jeton CSRF de la session, ou en génère un nouveau si absent. */
+    private String assurerTokenCSRF(HttpServletRequest request) {
+        HttpSession session = request.getSession(true);
+        String token = (String) session.getAttribute(SessionKeys.CSRF_TOKEN);
+        if (token == null || token.isBlank()) {
+            byte[] octets = new byte[32];
+            RANDOM.nextBytes(octets);
+            token = Base64.getUrlEncoder().withoutPadding().encodeToString(octets);
+            session.setAttribute(SessionKeys.CSRF_TOKEN, token);
+        }
+        return token;
+    }
+
+    /** Valide le jeton envoyé par le formulaire contre celui de la session (comparaison temps constant). */
+    private boolean validerTokenCSRF(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return false;
+        }
+        String sessionToken = (String) session.getAttribute(SessionKeys.CSRF_TOKEN);
+        String requestToken = request.getParameter(SessionKeys.CSRF_TOKEN);
+        if (sessionToken == null || requestToken == null) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                sessionToken.getBytes(StandardCharsets.UTF_8),
+                requestToken.getBytes(StandardCharsets.UTF_8));
     }
 
     /**

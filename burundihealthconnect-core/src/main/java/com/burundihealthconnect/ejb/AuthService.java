@@ -67,6 +67,12 @@ public class AuthService {
             throw new AccesInterditException("Email ou mot de passe incorrect.");
         }
 
+        // Migration transparente : un ancien hash (SHA-256) est converti en
+        // bcrypt à la prochaine connexion réussie, pour durcir le stockage.
+        if (!PasswordHasher.estBcrypt(utilisateur.getPasswordHash())) {
+            utilisateur.setPasswordHash(PasswordHasher.hash(motDePasseClair));
+        }
+
         utilisateur.setDerniereConnexion(LocalDateTime.now());
         em.merge(utilisateur);
         auditService.enregistrer("CONNEXION", "AUTH", "INFO", "UTILISATEUR", utilisateur.getIdUtilisateur(), "Connexion réussie: " + email, utilisateur, null);

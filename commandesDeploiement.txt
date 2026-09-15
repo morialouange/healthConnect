@@ -1,0 +1,3 @@
+asadmin start-domain domain1  pour demarree glassfish
+
+asadmin deploy --force D:\Projet\ProjetJakarta\burundihealthconnect-web\target\burundihealthconnect.war

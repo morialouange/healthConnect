@@ -1,0 +1,74 @@
+ git add burundihealthconnect-core/ (Personne A)
+- git add burundihealthconnect-web/ (Personne B)
+- Zéro conflit car ils ne touchent jamais aux mêmes fichiers
+- Un seul git push chacun
+Option B : 2 dépôts séparés
+- github.com/user/burundihealthconnect-core (Personne A)
+- github.com/user/burundihealthconnect-web (Personne B)
+- Avantage : isolation totale
+- Inconvénient : build impossible seul (le web dépend du core)
+Je recommande l'Option A (1 dépôt). C'est ce qui se fait en entreprise : un mono-repo avec des modules Maven. Chacun add/commit/push uniquement les fichiers de son module. Vous ne serez jamais en conflit.
+▣  Build · Big Pickle · 9.2s
+cela je comprends aloers tous les fichiers sont presents donc en combinanat ces deux structures toutes les dossiers du projets sont ils presents ou bien 
++ Thought: 875ms
+✱Glob "**/*" in . (100 matches)
++ Thought: 695ms
+$ Get-ChildItem -Path "D:\Projet\ProjetJakarta" -Recurse -File | Where-Object { $_.FullName -notmatch '\\target\\' } | ForEach-Object { $_.FullName.Replace('D:\Projet\ProjetJakarta\', '') } | Sort-Object
+burundihealthconnect\pom.xml
+burundihealthconnect\src\main\java\ejb\AuditService.java
+burundihealthconnect\src\main\java\ejb\AuthService.java
+burundihealthconnect\src\main\java\ejb\CongeService.java
+burundihealthconnect\src\main\java\ejb\ConsultationService.java
+burundihealthconnect\src\main\java\ejb\DisponibiliteService.java
+burundihealthconnect\src\main\java\ejb\DossierService.java
+burundihealthconnect\src\main\java\ejb\EtablissementService.java
+burundihealthconnect\src\main\java\ejb\MedecinService.java
+burundihealthconnect\src\main\java\ejb\Notificati…
+Click to expand
++ Thought: 3.8s
+Oui, tous les fichiers sont présents. Voici la liste complète et définitive de ce qui doit être poussé sur Git :
+Fichiers source du projet (hors target/)
+Racine (partagé — 2 fichiers)
+pom.xml
+prompt/PromptDashboard
+Personne A — burundihealthconnect-core/ (57 fichiers source)
+├── pom.xml
+└── src/main/
+    ├── java/com/burundihealthconnect/
+    │   ├── ejb/          (17 fichiers)
+    │   ├── entity/       (20 entités + 10 enums = 30 fichiers)
+    │   ├── exception/    (7 fichiers)
+    │   └── util/         (2 fichiers)
+    └── resources/META-INF/
+        ├── persistence.xml
+        └── beans.xml
+Personne B — burundihealthconnect-web/ (63 fichiers source)
+├── pom.xml
+├── src/main/
+│   ├── java/com/burundihealthconnect/
+│   │   ├── servlet/     (7 fichiers)
+│   │   └── filter/      (2 fichiers)
+│   ├── resources/
+│   │   ├── META-INF/beans.xml
+│   │   └── com/burundihealthconnect/i18n/ (2 fichiers)
+│   └── webapp/
+│       ├── accueil.jsp, index.jsp
+│       ├── css/         (2 fichiers)
+│       ├── js/          (2 fichiers)
+│       ├── img/         (1 fichier)
+│       └── WEB-INF/
+│           ├── web.xml
+│           └── views/   (46 fichiers JSP)
+Personne A aussi — databaseAndLogic/ (9 fichiers)
+medicentral_script_v2.sql, correction_audit_logs.sql, ajoutPourDashboard.txt
+medicentral_prompt_logique_complet.txt, design, correctionDesign
+Projet JEE.pdf, AccueilPage.png, dashbord.png
+À NE PAS pousser
+burundihealthconnect/   ← obsolète (copie de core+web), à supprimer
+Bilan :
+- Personne A (core + database) = ~67 fichiers
+- Personne B (web) = ~63 fichiers
+- Partagé (pom.xml racine, prompt) = 2 fichiers
+- Zéro fichier en commun entre les deux personnes → 0 conflit Git
+Les fichiers target/ (build) sont exclus via .gitignore — ne les poussez pas.
+▣  Build · Big Pickle · 19.4s

@@ -9,7 +9,6 @@ import com.burundihealthconnect.entity.enums.Role;
 import com.burundihealthconnect.exception.BusinessException;
 
 import jakarta.inject.Inject;
-import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -19,9 +18,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * SuperAdminServlet — @WebServlet("/superadmin/*")
@@ -122,7 +119,7 @@ public class SuperAdminServlet extends HttpServlet {
     private void afficherHopitaux(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         String filtre = request.getParameter("filtre");
-        int page = parseIntOuZero(request.getParameter("page"));
+        int page = ServletUtils.parseIntOuZero(request.getParameter("page"));
         String tri = request.getParameter("tri");
         String ordre = request.getParameter("ordre");
         request.setAttribute("hopitaux", etablissementService.findAll(filtre, page, tri, ordre));
@@ -132,9 +129,9 @@ public class SuperAdminServlet extends HttpServlet {
         request.setAttribute("tri", tri);
         request.setAttribute("ordre", ordre);
         long totalCount = etablissementService.countAll(filtre);
-        int totalPages = (int) Math.ceil((double) totalCount / 10);
+        int totalPages = (int) Math.ceil((double) totalCount / ServletUtils.TAILLE_PAGE);
         request.setAttribute("totalPages", totalPages);
-        forward(request, response, "/WEB-INF/views/superadmin/hopitaux.jsp");
+        ServletUtils.forward(request, response, "/WEB-INF/views/superadmin/hopitaux.jsp");
     }
 
     private void traiterCreerHopital(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -145,28 +142,28 @@ public class SuperAdminServlet extends HttpServlet {
         String telephone = request.getParameter("telephone");
 
         if (nom == null || nom.isBlank()) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux",
-                    message(request, "error.validation.required").replace("{0}", "Nom"));
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux",
+                    ServletUtils.message(request, "error.validation.required").replace("{0}", "Nom"));
             return;
         }
-        if (!isValidMaxLength(nom, MAX_LENGTH)) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux",
-                    message(request, "error.validation.maxlength").replace("{0}", "Nom").replace("{1}", "100"));
+        if (!ServletUtils.isValidMaxLength(nom, ServletUtils.MAX_LENGTH)) {
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux",
+                    ServletUtils.message(request, "error.validation.maxlength").replace("{0}", "Nom").replace("{1}", "100"));
             return;
         }
         if (adresse == null || adresse.isBlank()) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux",
-                    message(request, "error.validation.required").replace("{0}", "Adresse"));
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux",
+                    ServletUtils.message(request, "error.validation.required").replace("{0}", "Adresse"));
             return;
         }
-        if (email != null && !email.isBlank() && !isValidEmail(email)) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux",
-                    message(request, "error.validation.email"));
+        if (email != null && !email.isBlank() && !ServletUtils.isValidEmail(email)) {
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux",
+                    ServletUtils.message(request, "error.validation.email"));
             return;
         }
-        if (telephone != null && !telephone.isBlank() && !isValidTelephone(telephone)) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux",
-                    message(request, "error.validation.telephone"));
+        if (telephone != null && !telephone.isBlank() && !ServletUtils.isValidTelephone(telephone)) {
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux",
+                    ServletUtils.message(request, "error.validation.telephone"));
             return;
         }
 
@@ -174,54 +171,54 @@ public class SuperAdminServlet extends HttpServlet {
             etablissementService.creerEtablissement(nom.trim(), adresse.trim(), typeEtablissement, email, telephone);
             response.sendRedirect(request.getContextPath() + "/superadmin/hopitaux?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
         }
     }
 
     private void traiterModifierHopital(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        Long idEtablissement = parseLongOuNull(request.getParameter("idEtablissement"));
+        Long idEtablissement = ServletUtils.parseLongOuNull(request.getParameter("idEtablissement"));
         if (idEtablissement == null) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", "Établissement introuvable.");
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", "Établissement introuvable.");
             return;
         }
         try {
             etablissementService.modifierEtablissement(idEtablissement,
-                    videSiVide(request.getParameter("nom")),
-                    videSiVide(request.getParameter("adresse")),
-                    videSiVide(request.getParameter("typeEtablissement")),
-                    videSiVide(request.getParameter("email")),
-                    videSiVide(request.getParameter("telephone")));
+                    ServletUtils.videSiVide(request.getParameter("nom")),
+                    ServletUtils.videSiVide(request.getParameter("adresse")),
+                    ServletUtils.videSiVide(request.getParameter("typeEtablissement")),
+                    ServletUtils.videSiVide(request.getParameter("email")),
+                    ServletUtils.videSiVide(request.getParameter("telephone")));
             response.sendRedirect(request.getContextPath() + "/superadmin/hopitaux?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
         }
     }
 
     private void traiterDesactiverHopital(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        Long idEtablissement = parseLongOuNull(request.getParameter("idEtablissement"));
+        Long idEtablissement = ServletUtils.parseLongOuNull(request.getParameter("idEtablissement"));
         if (idEtablissement == null) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", "Établissement introuvable.");
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", "Établissement introuvable.");
             return;
         }
         try {
             etablissementService.desactiverEtablissement(idEtablissement);
             response.sendRedirect(request.getContextPath() + "/superadmin/hopitaux?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
         }
     }
 
     private void traiterReactiverHopital(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        Long idEtablissement = parseLongOuNull(request.getParameter("idEtablissement"));
+        Long idEtablissement = ServletUtils.parseLongOuNull(request.getParameter("idEtablissement"));
         if (idEtablissement == null) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", "Établissement introuvable.");
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", "Établissement introuvable.");
             return;
         }
         try {
             etablissementService.reactiverEtablissement(idEtablissement);
             response.sendRedirect(request.getContextPath() + "/superadmin/hopitaux?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
         }
     }
 
@@ -233,31 +230,31 @@ public class SuperAdminServlet extends HttpServlet {
         String fullName = request.getParameter("fullName");
         String email = request.getParameter("email");
         String motDePasseTemporaire = request.getParameter("motDePasseTemporaire");
-        Long idEtablissement = parseLongOuNull(request.getParameter("idEtablissement"));
+        Long idEtablissement = ServletUtils.parseLongOuNull(request.getParameter("idEtablissement"));
 
         if (fullName == null || fullName.isBlank()) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux",
-                    message(request, "error.validation.fullname.required"));
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux",
+                    ServletUtils.message(request, "error.validation.fullname.required"));
             return;
         }
-        if (!isValidMaxLength(fullName, MAX_LENGTH)) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux",
-                    message(request, "error.validation.fullname.length"));
+        if (!ServletUtils.isValidMaxLength(fullName, ServletUtils.MAX_LENGTH)) {
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux",
+                    ServletUtils.message(request, "error.validation.fullname.length"));
             return;
         }
-        if (email == null || email.isBlank() || !isValidEmail(email)) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux",
-                    message(request, "error.validation.email"));
+        if (email == null || email.isBlank() || !ServletUtils.isValidEmail(email)) {
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux",
+                    ServletUtils.message(request, "error.validation.email"));
             return;
         }
         if (motDePasseTemporaire == null || motDePasseTemporaire.length() < 8) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux",
-                    message(request, "error.validation.password.min"));
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux",
+                    ServletUtils.message(request, "error.validation.password.min"));
             return;
         }
         if (idEtablissement == null) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux",
-                    message(request, "error.validation.required").replace("{0}", "Établissement"));
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux",
+                    ServletUtils.message(request, "error.validation.required").replace("{0}", "Établissement"));
             return;
         }
 
@@ -265,7 +262,7 @@ public class SuperAdminServlet extends HttpServlet {
             authService.creerCompteAdmin(fullName.trim(), email.trim(), motDePasseTemporaire, idEtablissement);
             response.sendRedirect(request.getContextPath() + "/superadmin/hopitaux?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
         }
     }
 
@@ -275,75 +272,75 @@ public class SuperAdminServlet extends HttpServlet {
 
     private void afficherFormulaireModifierAdmin(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        Long idUtilisateur = parseLongOuNull(request.getParameter("idUtilisateur"));
+        Long idUtilisateur = ServletUtils.parseLongOuNull(request.getParameter("idUtilisateur"));
         if (idUtilisateur == null) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", "Administrateur introuvable.");
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", "Administrateur introuvable.");
             return;
         }
         try {
             Utilisateur admin = authService.getUtilisateurById(idUtilisateur);
             request.setAttribute("admin", admin);
             request.setAttribute("hopitaux", etablissementService.findAll(0));
-            forward(request, response, "/WEB-INF/views/superadmin/admin-modifier.jsp");
+            ServletUtils.forward(request, response, "/WEB-INF/views/superadmin/admin-modifier.jsp");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
         }
     }
 
     private void traiterModifierAdmin(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        Long idUtilisateur = parseLongOuNull(request.getParameter("idUtilisateur"));
+        Long idUtilisateur = ServletUtils.parseLongOuNull(request.getParameter("idUtilisateur"));
         if (idUtilisateur == null) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", "Administrateur introuvable.");
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", "Administrateur introuvable.");
             return;
         }
         String fullName = request.getParameter("fullName");
-        if (fullName != null && !fullName.isBlank() && !isValidMaxLength(fullName, MAX_LENGTH)) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux",
-                    message(request, "error.validation.fullname.length"));
+        if (fullName != null && !fullName.isBlank() && !ServletUtils.isValidMaxLength(fullName, ServletUtils.MAX_LENGTH)) {
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux",
+                    ServletUtils.message(request, "error.validation.fullname.length"));
             return;
         }
         String email = request.getParameter("email");
-        if (email != null && !email.isBlank() && !isValidEmail(email)) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux",
-                    message(request, "error.validation.email"));
+        if (email != null && !email.isBlank() && !ServletUtils.isValidEmail(email)) {
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux",
+                    ServletUtils.message(request, "error.validation.email"));
             return;
         }
         try {
             authService.modifierAdmin(idUtilisateur,
-                    videSiVide(fullName),
-                    videSiVide(email),
-                    parseLongOuNull(request.getParameter("idEtablissement")));
+                    ServletUtils.videSiVide(fullName),
+                    ServletUtils.videSiVide(email),
+                    ServletUtils.parseLongOuNull(request.getParameter("idEtablissement")));
             response.sendRedirect(request.getContextPath() + "/superadmin/hopitaux?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
         }
     }
 
     private void traiterDesactiverAdmin(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        Long idUtilisateur = parseLongOuNull(request.getParameter("idUtilisateur"));
+        Long idUtilisateur = ServletUtils.parseLongOuNull(request.getParameter("idUtilisateur"));
         if (idUtilisateur == null) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", "Administrateur introuvable.");
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", "Administrateur introuvable.");
             return;
         }
         try {
             authService.desactiverUtilisateur(idUtilisateur);
             response.sendRedirect(request.getContextPath() + "/superadmin/hopitaux?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
         }
     }
 
     private void traiterReactiverAdmin(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        Long idUtilisateur = parseLongOuNull(request.getParameter("idUtilisateur"));
+        Long idUtilisateur = ServletUtils.parseLongOuNull(request.getParameter("idUtilisateur"));
         if (idUtilisateur == null) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", "Administrateur introuvable.");
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", "Administrateur introuvable.");
             return;
         }
         try {
             authService.reactiverUtilisateur(idUtilisateur);
             response.sendRedirect(request.getContextPath() + "/superadmin/hopitaux?succes=1");
         } catch (BusinessException e) {
-            redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
+            ServletUtils.redirigerAvecErreur(request, response, "/superadmin/hopitaux", e.getMessage());
         }
     }
 
@@ -355,7 +352,7 @@ public class SuperAdminServlet extends HttpServlet {
             throws ServletException, IOException {
         Map<String, Object> stats = etablissementService.getStatistiques(Role.SUPER_ADMIN, null, null);
         request.setAttribute("stats", stats);
-        forward(request, response, "/WEB-INF/views/superadmin/stats.jsp");
+        ServletUtils.forward(request, response, "/WEB-INF/views/superadmin/stats.jsp");
     }
 
     // =========================================================
@@ -364,13 +361,13 @@ public class SuperAdminServlet extends HttpServlet {
 
     private void afficherJournal(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        int page = parseIntOuZero(request.getParameter("page"));
+        int page = ServletUtils.parseIntOuZero(request.getParameter("page"));
         request.setAttribute("journal", dossierService.getJournalAccesGlobal(page));
         request.setAttribute("page", page);
         long totalCount = dossierService.countJournalAccesGlobal();
-        int totalPages = (int) Math.ceil((double) totalCount / 10);
+        int totalPages = (int) Math.ceil((double) totalCount / ServletUtils.TAILLE_PAGE);
         request.setAttribute("totalPages", totalPages);
-        forward(request, response, "/WEB-INF/views/superadmin/journal.jsp");
+        ServletUtils.forward(request, response, "/WEB-INF/views/superadmin/journal.jsp");
     }
 
     // =========================================================
@@ -379,13 +376,13 @@ public class SuperAdminServlet extends HttpServlet {
 
     private void afficherHistorique(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        int page = parseIntOuZero(request.getParameter("page"));
+        int page = ServletUtils.parseIntOuZero(request.getParameter("page"));
         request.setAttribute("historique", dossierService.getHistoriqueModificationsGlobal(page));
         request.setAttribute("page", page);
         long totalCount = dossierService.countHistoriqueModificationsGlobal();
-        int totalPages = (int) Math.ceil((double) totalCount / 10);
+        int totalPages = (int) Math.ceil((double) totalCount / ServletUtils.TAILLE_PAGE);
         request.setAttribute("totalPages", totalPages);
-        forward(request, response, "/WEB-INF/views/superadmin/historique.jsp");
+        ServletUtils.forward(request, response, "/WEB-INF/views/superadmin/historique.jsp");
     }
 
     // =========================================================
@@ -403,7 +400,7 @@ public class SuperAdminServlet extends HttpServlet {
         request.setAttribute("comptesDesactives", stats.get("comptesDesactives"));
         request.setAttribute("servicesInactifs", stats.get("servicesInactifs"));
 
-        forward(request, response, "/WEB-INF/views/superadmin/dashboard.jsp");
+        ServletUtils.forward(request, response, "/WEB-INF/views/superadmin/dashboard.jsp");
     }
 
     // =========================================================
@@ -412,10 +409,10 @@ public class SuperAdminServlet extends HttpServlet {
 
     private void afficherAudit(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        int page = parseIntOuZero(request.getParameter("page"));
-        String filtreModule = videSiVide(request.getParameter("module"));
-        String filtreNiveau = videSiVide(request.getParameter("niveau"));
-        String filtreRecherche = videSiVide(request.getParameter("recherche"));
+        int page = ServletUtils.parseIntOuZero(request.getParameter("page"));
+        String filtreModule = ServletUtils.videSiVide(request.getParameter("module"));
+        String filtreNiveau = ServletUtils.videSiVide(request.getParameter("niveau"));
+        String filtreRecherche = ServletUtils.videSiVide(request.getParameter("recherche"));
         LocalDate dateDebut = parseDate(request.getParameter("dateDebut"));
         LocalDate dateFin = parseDate(request.getParameter("dateFin"));
 
@@ -426,7 +423,7 @@ public class SuperAdminServlet extends HttpServlet {
         request.setAttribute("activite7Jours", auditService.getActivite7Jours());
         request.setAttribute("page", page);
         long totalCount = auditService.countLogs(filtreModule, filtreNiveau, filtreRecherche, dateDebut, dateFin);
-        int totalPages = (int) Math.ceil((double) totalCount / 10);
+        int totalPages = (int) Math.ceil((double) totalCount / ServletUtils.TAILLE_PAGE);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("filtreModule", filtreModule);
         request.setAttribute("filtreNiveau", filtreNiveau);
@@ -434,7 +431,7 @@ public class SuperAdminServlet extends HttpServlet {
         request.setAttribute("dateDebut", dateDebut != null ? dateDebut.toString() : "");
         request.setAttribute("dateFin", dateFin != null ? dateFin.toString() : "");
 
-        forward(request, response, "/WEB-INF/views/superadmin/audit.jsp");
+        ServletUtils.forward(request, response, "/WEB-INF/views/superadmin/audit.jsp");
     }
 
     private void traiterFiltrerAudit(HttpServletRequest request, HttpServletResponse response)
@@ -461,79 +458,5 @@ public class SuperAdminServlet extends HttpServlet {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    // =========================================================
-    // VALIDATION
-    // =========================================================
-
-    private static final Pattern EMAIL_PATTERN =
-        Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
-    private static final int MAX_LENGTH = 100;
-
-    private boolean isValidEmail(String email) {
-        return email != null && EMAIL_PATTERN.matcher(email).matches();
-    }
-
-    private boolean isValidTelephone(String telephone) {
-        return telephone == null || telephone.isBlank() || telephone.replaceAll("[^0-9]", "").length() >= 8
-            && telephone.replaceAll("[^0-9]", "").length() <= 15;
-    }
-
-    private boolean isValidMaxLength(String valeur, int max) {
-        return valeur == null || valeur.length() <= max;
-    }
-
-    private boolean isExperienceValide(String experienceStr) {
-        if (experienceStr == null || experienceStr.isBlank()) return true;
-        try {
-            return Integer.parseInt(experienceStr.replaceAll("[^0-9\\-]", "")) >= 0;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
-    // =========================================================
-    // UTILITAIRES
-    // =========================================================
-
-    private String videSiVide(String valeur) {
-        return (valeur == null || valeur.isBlank()) ? null : valeur.trim();
-    }
-
-    private void redirigerAvecErreur(HttpServletRequest request, HttpServletResponse response,
-                                      String url, String message) throws IOException {
-        response.sendRedirect(request.getContextPath() + url + "?erreur="
-                + java.net.URLEncoder.encode(message, java.nio.charset.StandardCharsets.UTF_8));
-    }
-
-    private Long parseLongOuNull(String valeur) {
-        try {
-            return (valeur == null || valeur.isBlank()) ? null : Long.parseLong(valeur);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private int parseIntOuZero(String valeur) {
-        try {
-            return (valeur == null || valeur.isBlank()) ? 0 : Integer.parseInt(valeur);
-        } catch (NumberFormatException e) {
-            return 0;
-        }
-    }
-
-    private String message(HttpServletRequest request, String key) {
-        String lang = (String) request.getSession().getAttribute("langue");
-        if (lang == null) lang = "fr";
-        Locale locale = Locale.forLanguageTag(lang);
-        java.util.ResourceBundle bundle = java.util.ResourceBundle.getBundle("com.burundihealthconnect.i18n.messages", locale);
-        return bundle.getString(key);
-    }
-
-    private void forward(HttpServletRequest request, HttpServletResponse response, String vue)
-            throws ServletException, IOException {
-        RequestDispatcher dispatcher = request.getRequestDispatcher(vue);
-        dispatcher.forward(request, response);
     }
 }

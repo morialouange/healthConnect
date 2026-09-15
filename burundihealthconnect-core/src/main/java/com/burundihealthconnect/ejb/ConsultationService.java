@@ -11,6 +11,7 @@ import com.burundihealthconnect.entity.RendezVous;
 import com.burundihealthconnect.entity.enums.StatutConsultation;
 import com.burundihealthconnect.entity.enums.StatutRdv;
 import com.burundihealthconnect.exception.AccesInterditException;
+import com.burundihealthconnect.exception.BusinessException;
 import com.burundihealthconnect.exception.EntiteIntrouvableException;
 
 import com.burundihealthconnect.ejb.AuditService;
@@ -20,6 +21,7 @@ import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -48,6 +50,9 @@ public class ConsultationService {
     private OrdonnanceService ordonnanceService;
 
     private static final int TAILLE_PAGE = 10;
+
+    /** Tolérance d'avance (minutes) pour démarrer la consultation avant le créneau. */
+    private static final int TOLERANCE_DEMARRAGE_MIN = 15;
 
     // =========================================================
     // WORKFLOW CONSULTATION — L02
@@ -88,8 +93,12 @@ public class ConsultationService {
             if (rdv.getStatut() != StatutRdv.RDV_CONFIRME) {
                 throw new AccesInterditException("Seul un RDV confirmé peut démarrer une consultation.");
             }
-            rdv.setStatut(StatutRdv.TERMINE);
-            em.merge(rdv);
+            if (rdv.getDateRendez() != null
+                    && rdv.getDateRendez().isAfter(LocalDateTime.now().plusMinutes(TOLERANCE_DEMARRAGE_MIN))) {
+                throw new BusinessException("Le rendez-vous n'a pas encore atteint son créneau "
+                        + rdv.getDateRendez() + " : démarrage autorisé à partir de "
+                        + rdv.getDateRendez().minusMinutes(TOLERANCE_DEMARRAGE_MIN) + ".");
+            }
             consultation.setRendezVous(rdv);
         }
 
@@ -152,6 +161,13 @@ public class ConsultationService {
 
         consultation.setStatut(StatutConsultation.VERSEE_AU_DOSSIER);
         em.merge(consultation);
+
+        // Marquer le RDV associé comme TERMINÉ uniquement au versement au dossier (L02).
+        RendezVous rdv = consultation.getRendezVous();
+        if (rdv != null && rdv.getStatut() == StatutRdv.RDV_CONFIRME) {
+            rdv.setStatut(StatutRdv.TERMINE);
+            em.merge(rdv);
+        }
 
         dossierService.ajouterConsultation(consultation.getDossier().getIdDossier(), consultation);
         auditService.enregistrer("VERSEMENT_CONSULTATION", "CONSULTATION", "INFO", "CONSULTATION", idConsultation, "Versement dossier", null, null);

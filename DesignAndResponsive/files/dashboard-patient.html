@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>MediCentral — Tableau de bord Patient</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo"><span class="dot"></span> MediCentral</div>
+    <ul class="sidebar-nav">
+      <li class="sidebar-item active">🏠 Tableau de bord</li>
+      <li class="sidebar-item">🗂️ Mon dossier médical</li>
+      <li class="sidebar-item">➕ Prendre rendez-vous</li>
+      <li class="sidebar-item">📅 Mes rendez-vous</li>
+      <li class="sidebar-item">💊 Mes ordonnances</li>
+      <li class="sidebar-item">↪️ Mes référencements</li>
+      <li class="sidebar-item">👤 Mon profil</li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="card" style="padding:14px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Emmanuel Hakizimana</div>
+        <div style="font-size:12px;color:var(--text-muted);">N° patient : PAT-2026-01847</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-area">
+
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="sidebar-toggle-btn" title="Réduire/afficher le menu" aria-label="Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Rechercher un hôpital, un médecin...">
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn" id="theme-toggle" title="Changer de thème" aria-label="Changer de thème">☾</button>
+        <div class="icon-btn" title="Notifications" aria-label="Notifications">🔔<span class="dot-alert"></span></div>
+        <div class="user-chip">
+          <div class="avatar">EH</div>
+          <div>
+            <div class="user-name">Emmanuel Hakizimana</div>
+            <div class="role">Patient</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <div class="page-header">
+        <h1>Bonjour, Emmanuel</h1>
+        <p>Voici un aperçu de votre suivi médical.</p>
+      </div>
+
+      <!-- KPI -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon">📅</div>
+          <div class="kpi-label">Prochain rendez-vous</div>
+          <div class="kpi-value" style="font-size:18px;">12 Sept — 10:30</div>
+          <div class="kpi-trend up">Dr. Amina Niyonzima</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">🗓️</div>
+          <div class="kpi-label">Rendez-vous à venir</div>
+          <div class="kpi-value">2</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">💊</div>
+          <div class="kpi-label">Ordonnances actives</div>
+          <div class="kpi-value">1</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">🩸</div>
+          <div class="kpi-label">Groupe sanguin</div>
+          <div class="kpi-value">O+</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;align-items:stretch;">
+
+        <div class="card">
+          <h3>Mes rendez-vous</h3>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th scope="col">Hôpital</th><th scope="col">Médecin</th><th scope="col">Date</th><th scope="col">Statut</th><th scope="col"></th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Hôpital Central de Gitega</td><td>Dr. Amina Niyonzima</td><td>12/09/2026 — 10:30</td>
+                  <td><span class="badge badge-info">Confirmé</span></td>
+                  <td><button class="btn btn-ghost btn-sm">Détails</button></td>
+                </tr>
+                <tr>
+                  <td>Hôpital Central de Gitega</td><td>Dr. Eric Ndikumana</td><td>20/09/2026 — 14:00</td>
+                  <td><span class="badge badge-warning">Demandé</span></td>
+                  <td><button class="btn btn-danger btn-sm">Annuler</button></td>
+                </tr>
+                <tr>
+                  <td>Clinique Sainte-Rita</td><td>Dr. Clarisse Bukuru</td><td>02/09/2026 — 09:00</td>
+                  <td><span class="badge badge-success">Terminé</span></td>
+                  <td><button class="btn btn-ghost btn-sm">Voir compte-rendu</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="margin-top:14px;">
+            <button class="btn btn-primary">+ Prendre un nouveau rendez-vous</button>
+          </div>
+        </div>
+
+        <div class="card card-fill">
+          <h3>Mon dossier médical <span style="font-size:11px;color:var(--text-muted);font-weight:500;">(lecture seule)</span></h3>
+          <div class="form-group">
+            <span class="form-label">Numéro de dossier</span>
+            <div style="font-weight:600;">DOS-2026-01847</div>
+          </div>
+          <div class="form-group">
+            <span class="form-label">Groupe sanguin</span>
+            <div style="font-weight:600;">O+</div>
+          </div>
+          <div class="form-group">
+            <span class="form-label">Allergies</span>
+            <div style="font-weight:600;">Pénicilline</div>
+          </div>
+          <div class="form-group">
+            <span class="form-label">Antécédents</span>
+            <div style="color:var(--text-secondary);">Hypertension légère, suivi en cardiologie depuis 2024.</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" style="margin-bottom:20px;">Voir le dossier complet</button>
+          <div class="insight-box">
+            <span class="insight-icon">🗓️</span>
+            <div>
+              <div class="insight-title">Dossier à jour</div>
+              <div class="insight-desc">Dernière mise à jour le <strong>02/09/2026</strong> par Dr. Clarisse Bukuru.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px;">
+        <h3>Mes ordonnances récentes</h3>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th scope="col">Date</th><th scope="col">Médecin</th><th scope="col">Instructions</th><th scope="col"></th></tr>
+            </thead>
+            <tbody>
+              <tr><td>02/09/2026</td><td>Dr. Clarisse Bukuru</td><td>Traitement anti-inflammatoire — 7 jours</td><td><button class="btn btn-ghost btn-sm">Voir détails</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="charts-row">
+
+        <div class="card">
+          <div class="chart-card-header">
+            <h3>Mes rendez-vous par mois</h3>
+            <span class="chart-period">2026</span>
+          </div>
+          <svg viewBox="0 0 480 190" width="100%" height="190">
+            <line x1="40" y1="30" x2="460" y2="30" class="chart-grid-line" stroke-dasharray="4 4"/>
+            <line x1="40" y1="70" x2="460" y2="70" class="chart-grid-line" stroke-dasharray="4 4"/>
+            <line x1="40" y1="110" x2="460" y2="110" class="chart-grid-line" stroke-dasharray="4 4"/>
+            <line x1="40" y1="150" x2="460" y2="150" class="chart-grid-line"/>
+            <rect class="bar-rect" x="40"  y="107" width="60" height="43"  rx="4"/>
+            <rect class="bar-rect" x="112" y="63"  width="60" height="87"  rx="4"/>
+            <rect class="bar-rect" x="184" y="107" width="60" height="43"  rx="4"/>
+            <rect class="bar-rect" x="256" y="20"  width="60" height="130" rx="4"/>
+            <rect class="bar-rect alt" x="328" y="63"  width="60" height="87"  rx="4"/>
+            <rect class="bar-rect alt" x="400" y="63"  width="60" height="87"  rx="4"/>
+            <text class="bar-value" x="70"  y="101">1</text>
+            <text class="bar-value" x="142" y="57">2</text>
+            <text class="bar-value" x="214" y="101">1</text>
+            <text class="bar-value" x="286" y="14">3</text>
+            <text class="bar-value" x="358" y="57">2</text>
+            <text class="bar-value" x="430" y="57">2</text>
+            <text class="bar-label" x="70"  y="168">Avr</text>
+            <text class="bar-label" x="142" y="168">Mai</text>
+            <text class="bar-label" x="214" y="168">Jun</text>
+            <text class="bar-label" x="286" y="168">Jul</text>
+            <text class="bar-label" x="358" y="168">Aoû</text>
+            <text class="bar-label" x="430" y="168">Sep</text>
+          </svg>
+        </div>
+
+        <div class="card">
+          <div class="chart-card-header">
+            <h3>Consultations terminées</h3>
+            <span class="chart-period">6 derniers mois</span>
+          </div>
+          <svg viewBox="0 0 480 190" width="100%" height="190">
+            <line x1="40" y1="30" x2="460" y2="30" class="chart-grid-line" stroke-dasharray="4 4"/>
+            <line x1="40" y1="70" x2="460" y2="70" class="chart-grid-line" stroke-dasharray="4 4"/>
+            <line x1="40" y1="110" x2="460" y2="110" class="chart-grid-line" stroke-dasharray="4 4"/>
+            <line x1="40" y1="150" x2="460" y2="150" class="chart-grid-line"/>
+            <path class="line-area" d="M40,150 L124,85 L208,85 L292,20 L376,85 L460,85 L460,150 L40,150 Z"/>
+            <path class="line-path" d="M40,150 L124,85 L208,85 L292,20 L376,85 L460,85"/>
+            <circle class="line-dot" cx="40" cy="150" r="4"/>
+            <circle class="line-dot" cx="124" cy="85" r="4"/>
+            <circle class="line-dot" cx="208" cy="85" r="4"/>
+            <circle class="line-dot" cx="292" cy="20" r="4"/>
+            <circle class="line-dot" cx="376" cy="85" r="4"/>
+            <circle class="line-dot" cx="460" cy="85" r="4"/>
+            <text class="line-value" x="40"  y="140">0</text>
+            <text class="line-value" x="124" y="75">1</text>
+            <text class="line-value" x="208" y="75">1</text>
+            <text class="line-value" x="292" y="10">2</text>
+            <text class="line-value" x="376" y="75">1</text>
+            <text class="line-value" x="460" y="75">1</text>
+            <text class="line-label" x="40" y="168">Avr</text>
+            <text class="line-label" x="124" y="168">Mai</text>
+            <text class="line-label" x="208" y="168">Jun</text>
+            <text class="line-label" x="292" y="168">Jul</text>
+            <text class="line-label" x="376" y="168">Aoû</text>
+            <text class="line-label" x="460" y="168">Sep</text>
+          </svg>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+  const root = document.documentElement;
+  const toggleBtn = document.getElementById('theme-toggle');
+  const saved = localStorage.getItem('mc-theme');
+  if (saved === 'dark') { root.setAttribute('data-theme', 'dark'); toggleBtn.textContent = '☀'; }
+  toggleBtn.addEventListener('click', () => {
+    const isDark = root.getAttribute('data-theme') === 'dark';
+    if (isDark) { root.removeAttribute('data-theme'); toggleBtn.textContent = '☾'; localStorage.setItem('mc-theme','light'); }
+    else { root.setAttribute('data-theme', 'dark'); toggleBtn.textContent = '☀'; localStorage.setItem('mc-theme','dark'); }
+  });
+</script>
+</body>
+</html>
