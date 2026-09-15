@@ -10,7 +10,7 @@
 [![MySQL](https://img.shields.io/badge/MySQL-8-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com)
 [![Maven](https://img.shields.io/badge/Maven-3-C71A36?logo=apache-maven&logoColor=white)](https://maven.apache.org)
 
-*Projet académique — BAC3 Génie Logiciel, Université Polytechnique de Gitega*
+
 
 </div>
 
@@ -167,6 +167,3 @@ Application accessible sur `http://localhost:8080/burundihealthconnect`.
 
 ---
 
-## 📄 Licence
-
-Projet académique réalisé dans le cadre de la **BAC3 Génie Logiciel — Université Polytechnique de Gitega**.
