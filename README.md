@@ -87,7 +87,7 @@ Points clés :
 - **Isolation multi-tenant** : instance unique, données filtrées par `id_etablissement` (session → EJB → requêtes JPQL)
 - **Transactions JTA** avec rollback automatique sur exception métier
 - **Pagination** systématique (10 éléments/page) et recherche par mots-clés
-- **Sécurité** : bcrypt, protection CSRF, contrôle d'accès applicatif par rôle
+- **Sécurité** : bcrypt, contrôle d'accès applicatif par rôle
 - **Schéma de données** géré exclusivement par script SQL (`schema-generation = none`)
 
 ---
