@@ -18,7 +18,7 @@
 
 ## 🧭 À propos
 
-**BurundiHealthConnect** est une plateforme **SaaS multi-tenant** de centralisation des dossiers médicaux pour un réseau d'établissements de santé. Elle couvre l'ensemble du parcours de soins : prise de rendez-vous, consultations, prescriptions avec alerte d'allergie, transferts de patients inter-hôpitaux et suivi d'un dossier médical centralisé sur tout le réseau.
+**BurundiHealthConnect** est une plateforme **multi-tenant** de centralisation des dossiers médicaux pour un réseau d'établissements de santé. Elle couvre l'ensemble du parcours de soins : prise de rendez-vous, consultations, prescriptions avec alerte d'allergie, transferts de patients inter-hôpitaux et suivi d'un dossier médical centralisé sur tout le réseau.
 
 La donnée se gère selon deux logiques complémentaires :
 - **Privée par établissement (tenant)** : rendez-vous, médecins, services, disponibilités…
